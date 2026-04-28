@@ -7,7 +7,7 @@ description: Help users write or modify per-character dialogue/behavior scripts 
 
 A skill for helping a user write or modify per-character dialogue scripts for **eraTW**, a text-RPG built on the Emuera era-script engine featuring ~150 Touhou Project characters. A "kojo" (口上) is the per-character dialogue + behavior script — one or more `.ERB` files the engine dispatches into when something happens with that character.
 
-**Read sections 0 through 9 inline.** Sections marked with `→ references/<file>.md` link to optional appendix material that gets loaded on demand when needed.
+**Read sections 0 through 11 inline.** Sections marked with `→ references/<file>.md` link to optional appendix material that gets loaded on demand when needed.
 
 ---
 
@@ -80,7 +80,7 @@ The user may share their current kojo or other characters' kojo for reference. *
 
 These are the bugs we see in nearly every first-pass kojo generation. Hold them in your head while writing. Each one is detailed in the relevant section/reference below.
 
-1. **`@FOO(ARG, TYPE = 0)` will not compile.** Emuera only accepts positional `ARG / ARG:N / ARGS / ARGS:N` parameter names. Custom names like `TYPE`, `相手残機`, `OPTION` raise a Lv2 warning and the variable becomes unreadable inside the body. Use `@FOO(ARG, ARG:1 = 0)` and (optionally) `TYPE = ARG:1` as an alias on the first line of the body. → §6 / `references/04-dsl-full.md`
+1. **`@FOO(ARG, TYPE = 0)` will not compile.** Emuera only accepts positional `ARG / ARG:N / ARGS / ARGS:N` parameter names. Custom names like `TYPE`, `相手残機`, `OPTION` raise a Lv2 warning and the variable becomes unreadable inside the body. Use `@FOO(ARG, ARG:1 = 0)` and (optionally) `TYPE = ARG:1` as an alias on the first line of the body. → §7 / `references/04-dsl-full.md`
 2. **`[[X]]` silently compiles to `0` when X is not in `Str.csv`.** Most character names — `[[アリス]]`, `[[ルナサ]]`, `[[メルラン]]`, `[[幽々子]]`, `[[ライコ]]`, etc. — are NOT in `Str.csv`, so `CASE [[ルナサ]]` becomes `CASE 0` and matches ARG=0 by accident. **Default to numeric IDs with comments**: `CASE 22  ;ルナサ`. Reserve `[[X]]` for names you've grep-confirmed in `Str.csv`.
 3. **`MASTER`, `TARGET`, `PLAYER`, `ASSI` are bare identifiers, not `[[MASTER]]`.** Writing `[[MASTER]]` produces a warning.
 4. **`@M_KOJO_EVENT_K{id}_1(ARG, ARG:1)` fires once PER CELL TRANSITION** the character makes anywhere on MASTER's current world map, not "once when entering MASTER's room." A char walking bedroom→corridor→dining will print 3 dialogue lines while MASTER is still asleep. **Mandatory first guard:** `SIF CFLAG:{id}:現在位置 != CFLAG:MASTER:現在位置 / RETURN 0`. Then branch on ARG sub-phase (1=MASTER walks in, 2=char walks in, 3-5=bath sub-phases). Same applies to `_2` (morning) and `_3` (sleep). → `references/05-event-arg-subphases.md`
@@ -137,7 +137,135 @@ If any check fails, fix and re-run. **Re-run after every Edit pass** because too
 
 ---
 
-## 3. The big picture — what's where
+## 3. Debugging with the user
+
+The verification pass (§2) catches static issues. But many bugs only show at runtime — a line that prints too many times, a predicate that doesn't fire, a CFLAG slot that's silently the wrong type. This section is the **iteration loop** you run *with the user* whenever something doesn't behave right after a kojo edit.
+
+### 3.1 How to get the game's log out
+
+The game has two relevant menu actions under **「文件」** (File menu):
+
+- **「保存日志」** — saves the current session log to a file in the game directory.
+- **「将日志复制到剪切板」** — copies the session log to clipboard, ready for the user to paste into chat.
+
+**The user pastes the relevant log section into the conversation; you read it.** Don't ask the user to summarize — let them paste raw. Logs are small and structured.
+
+In addition, the game writes `emuera.log` (live, appended) and `<YYYYMMDD-HHMMSS>.log` (per-session) files in the game root directory. The user can also share those.
+
+### 3.2 Compilation errors — must be fixed before anything else plays
+
+Compilation errors prevent the game from loading. They appear at game launch.
+
+**A healthy launch shows roughly four lines:**
+
+```
+如果出現了錯誤、請根據目錄下的報錯指導文件進行報錯
+1702 files were found in the lazy loading table
+Loading complete. Took 2.19 seconds.
+Press Enter or click to proceed.
+```
+
+**Any `警告Lv2:` lines between the second and third are compilation errors.** Example:
+
+```
+如果出現了錯誤、請根據目錄下的報錯指導文件進行報錯
+1702 files were found in the lazy loading table
+警告Lv2:口上・メッセージ関連\個人口上\020 Lyrica [リリカ]\リリカ\M_KOJO_K20_日記.ERB:第40行:函数"@DIARY_TEXT_K20"的参数错误:变量"PAGENUM"未在此函数中定义
+@DIARY_TEXT_K20, PAGENUM, MODE, PAGECOUNT
+警告Lv2:口上・メッセージ関連\個人口上\020 Lyrica [リリカ]\リリカ\M_KOJO_K20_日記.ERB:第41行:变量"PAGENUM"未在此函数中定义
+SELECTCASE PAGENUM
+Loading complete. Took 2.19 seconds.
+Press Enter or click to proceed.
+```
+
+Each `警告Lv2:` line tells you:
+- **File path** (relative to game root, e.g. `口上・メッセージ関連\個人口上\020 Lyrica [リリカ]\リリカ\M_KOJO_K20_日記.ERB`).
+- **Line number** (e.g. `第40行` = line 40).
+- **Function name affected** (e.g. `@DIARY_TEXT_K20`).
+- **The actual cause** (e.g. `参数错误:变量"PAGENUM"未在此函数中定义` — "param error: variable PAGENUM not defined in this function" — see pitfall #1: custom param names don't work; use `ARG/ARG:1/ARGS/ARGS:1`).
+
+**Workflow when the user pastes a compile error:**
+
+1. Tell the user: **«请把游戏启动时出现的所有 `警告Lv2:` 行都贴给我。** A healthy launch only shows the first 2 and last 2 lines you saw — anything between is an error that needs fixing.»
+2. Map each warning to a §1 pitfall (most warnings match one of the 12 listed there) or to the §2 verification-pass checks.
+3. Patch the file. Show a diff.
+4. **Confirm with the user**: «请重新启动游戏，看看 `警告Lv2:` 行有没有消失。» Repeat until clean.
+
+**Don't move on to runtime testing until startup is clean.** A game with compile errors at launch may *appear* to run but the affected labels will be silently broken.
+
+### 3.3 Runtime issues — proactive debug-print workflow
+
+After every non-trivial kojo edit, **proactively ask the user**:
+
+> «改完了。请在游戏里测试一下：[列出受影响的 cmd / 事件 / 触发条件]。如果有任何不对的地方（例如台词重复、不该触发的时候触发、对话乱序等），请告诉我并贴出 `「文件」→「将日志复制到剪切板」` 的内容。»
+
+If the user reports an issue:
+
+1. **Identify which body label fired** (or should have fired but didn't). Read the user's description; map it to a label.
+2. **Add temporary debug-prints** to that body capturing the relevant state (recipe in §3.4 below).
+3. **Hand back to the user**: «我加了一些临时的诊断打印。请重新触发刚才的操作 (e.g. 走进莉莉卡的房间)，然后用 `「文件」→「将日志复制到剪切板」` 把日志贴给我。»
+4. **Diagnose from the captured state**. Common patterns:
+   - A predicate evaluated wrong because a CFLAG was non-boolean (see pitfall #8 — `约会中` is a map-id).
+   - A label fired more times than expected (see pitfall #4 — `EVENT_K_1` fires per cell transition).
+   - A slot was zero because `[[X]]` failed to resolve (see pitfall #2).
+   - A function param was unreadable inside the body (see pitfall #1).
+5. **Patch and remove the debug-prints** in the same edit. Tell the user: «已修复。**注意我把诊断打印行删掉了**，这样以后正式玩的时候不会有 `[DBG]` 噪音。»
+
+### 3.4 The debug-print recipe
+
+To inspect state at any point in a body, add lines like:
+
+```erb
+;[DBG] — TEMPORARY; remove before declaring done
+PRINTFORML [DBG] DAY={DAY:0} MAIN_MAP={MAIN_MAP} TIME:5={TIME:5} TIME:2={TIME:2}
+PRINTFORML [DBG] ARG={ARG} ARG:1={ARG:1} SELECTCOM={SELECTCOM} TFLAG:50={TFLAG:50}
+PRINTFORML [DBG] CFLAG:20:現在位置={CFLAG:20:現在位置} CFLAG:MASTER:現在位置={CFLAG:MASTER:現在位置}
+PRINTFORML [DBG] CFLAG:20:约会中={CFLAG:20:约会中} FLAG:约会的对象={FLAG:约会的对象}
+PRINTFORML [DBG] TALENT:恋慕={TALENT:恋慕} TALENT:恋人={TALENT:恋人} ABL:20:親密={ABL:20:親密}
+```
+
+Notes on the syntax:
+
+- **`{<expr>}` inside any `PRINTFORM*` command** evaluates and substitutes the expression's value at print time. Numbers print as digits; strings print as text.
+- **`PRINT VARDUMP(<arr>)`** dumps an entire array's contents.
+- **Always prefix with `[DBG]`** so the user can spot your debug lines amid normal narration. Searching for `[DBG]` in the pasted log gets just the diagnostic output.
+- **For predicates that branch silently** (return without printing), put a debug-print *inside each branch* with a unique tag so the log reveals which path was taken:
+  ```erb
+  IF CHK_DATENOW(CFLAG:MASTER:约会中) && FLAG:约会的对象 == TARGET
+      PRINTFORML [DBG-A] dating-with-this-char branch taken
+      ...
+  ELSEIF TALENT:恋人
+      PRINTFORML [DBG-B] lover branch taken
+      ...
+  ELSE
+      PRINTFORML [DBG-C] fall-through branch taken
+      ...
+  ENDIF
+  ```
+- **Remove ALL debug lines** before declaring the kojo done. Grep for `[DBG]` in the file and delete each. The verification pass in §2 should catch any leftover.
+
+### 3.5 What the user's bug-report message looks like
+
+You should expect (and gently shape) the user to say something like:
+
+> «我刚刚走进莉莉卡的房间，但她的台词出现了 3 次。日志如下: [paste]»
+
+Or after a compile error:
+
+> «游戏启动时报错: [paste 警告Lv2: block]»
+
+Reply quickly with:
+
+1. **Quote the relevant log line(s) back** so the user knows you read it.
+2. **State the cause in one sentence** ("这是 §1 pitfall #4 — `EVENT_K_1` 每次角色走进新格子都会触发，body 缺少同格守卫。").
+3. **Show the fix as a diff.**
+4. **Tell the user the next step**: «请重新启动游戏看看是否还有报错。» / «请再触发一次该动作并粘贴新的日志。»
+
+Iteration cycles tend to be 30-60 seconds each (game restart + repro + paste). Stay terse — don't over-explain.
+
+---
+
+## 4. The big picture — what's where
 
 ```
 eraTW/
@@ -174,7 +302,7 @@ eraTW/
 
 ---
 
-## 4. Mental model — engine code vs kojo code
+## 5. Mental model — engine code vs kojo code
 
 There are two kinds of code in this game; keep them separated:
 
@@ -185,7 +313,7 @@ The contract between the two is just a **list of label names**. The engine decla
 
 So **as a kojo author you do not write `TRYCALLFORM ...`** — that line lives inside the engine and is not your concern. You only write `@LABEL_NAME` definitions. The engine reads the list of well-known label names and calls them. The full label catalog lives in `references/01-engine-label-catalog.md`.
 
-### 4.1 The dispatch flow, step-by-step
+### 5.1 The dispatch flow, step-by-step
 
 Concrete walk-through of what happens when the player uses command 300 (会話) on character ID 1 (Reimu):
 
@@ -203,7 +331,7 @@ Concrete walk-through of what happens when the player uses command 300 (会話) 
 
 That's the whole magic. The engine names labels using a few build-rules (one per dispatch kind); you provide the labels you want to populate.
 
-### 4.2 What ARG, ARG:1, ARG:3 etc. mean (positional arguments)
+### 5.2 What ARG, ARG:1, ARG:3 etc. mean (positional arguments)
 
 When the engine constructs a label name, some inputs go into the *name*; others get passed as **positional arguments to the body**:
 
@@ -234,7 +362,7 @@ What each positional `ARG` means **depends on the dispatch kind**: for SPEVENT, 
 
 ---
 
-## 5. Dispatch kinds — quick reference
+## 6. Dispatch kinds — quick reference
 
 The engine's `ARGS` keys (full label catalog → `references/01-engine-label-catalog.md`):
 
@@ -262,7 +390,7 @@ The engine's `ARGS` keys (full label catalog → `references/01-engine-label-cat
 
 ---
 
-## 6. Standard body shape (the most-reused template)
+## 7. Standard body shape (the most-reused template)
 
 Every command body follows this pattern. Use it as your default scaffold:
 
@@ -328,7 +456,7 @@ Contract points to remember:
 
 ---
 
-## 7. The `LOCAL = 0/1` "filled-in" idiom
+## 8. The `LOCAL = 0/1` "filled-in" idiom
 
 Bodies open with `LOCAL = 1` (filled) or `LOCAL = 0` (stub). `LOCAL = 0` causes the body to fall through silently. **Do not "fix" `LOCAL = 0` bodies** — they are intentional stubs.
 
@@ -359,7 +487,7 @@ This lets an author selectively enable/disable parts.
 
 ---
 
-## 8. The standard branching cascade
+## 9. The standard branching cascade
 
 The canonical conditional cascade in a daily/sex/sexual-harassment body:
 
@@ -384,27 +512,27 @@ For sex commands, add intermediate guards on `BASE:MASTER:勃起`, `TCVAR:破瓜
 
 ---
 
-## 9. When the user asks for X — quick recipes
+## 10. When the user asks for X — quick recipes
 
 Three common workflows. **Full worked examples** with file scaffolds, exact labels, and Chinese-prose templates are in `references/06-workflow-recipes.md`.
 
-### 9.1 New variant from scratch (target: empty char dir)
+### 10.1 New variant from scratch (target: empty char dir)
 
 1. Confirm character ID and dir name (use `references/08-character-id-table.md` or grep `Chara/`).
 2. Scaffold ~13 files: `イベント / 日常系 / 性交系 / セクハラ / 愛撫系 / 加虐系 / 道具系 / 派生 / カウンター / 弾幕勝負 / 刻印取得` plus optional `関数ライブラリ / 育児イベント / 日記 / INFO / 絶頂 / 奉仕系 / ハードな / 自慰系(あなた)`.
 3. In `イベント.ERB` write the existence label `@M_KOJO_K<id>(ARG) RETURN 1` plus FLAGSETTING / COLOR / UPDATE / ENCOUNTER skeletons.
-4. Fill ~5-10 most useful daily commands (300=会話, 301=泡茶, 302=身体接觸, 309=摸頭, 311=擁抱, 312=接吻, …) using the template in §6.
+4. Fill ~5-10 most useful daily commands (300=会話, 301=泡茶, 302=身体接觸, 309=摸頭, 311=擁抱, 312=接吻, …) using the template in §7.
 5. Leave `LOCAL = 0` stubs for everything else — engine falls back to default narration.
 6. Run §2 verification pass.
 
-### 9.2 Adding a one-shot scripted event (anniversary, holiday, etc.)
+### 10.2 Adding a one-shot scripted event (anniversary, holiday, etc.)
 
 1. Decide the trigger: `@SPECIALDAY_EVENT_K<id>` for date-based, `@K<id>_<NAME>` author-private for state-driven.
 2. Reserve a state-progress CFLAG (range 1000–1999, document it in `フラグ管理メモ.txt`).
 3. Author the event body — usually a multi-step scene with `CALL ASK_YN(...)` at branching points and `SOURCE:N:<slot> += <delta>` on completion.
 4. Hook the trigger from the existing `イベント.ERB` (add a `SIF <conditions> / CALL <event>` line in the appropriate engine slot).
 
-### 9.3 Modifying an existing kojo (small content tweak)
+### 10.3 Modifying an existing kojo (small content tweak)
 
 1. Identify the file (which `M_KOJO_K<id>_<category>.ERB`).
 2. Find the body label (`grep '^@'` for the relevant `_<cmd>` or `_<n>`).
@@ -412,10 +540,10 @@ Three common workflows. **Full worked examples** with file scaffolds, exact labe
 
 ---
 
-## 10. Final reminders for you (the helper LLM)
+## 11. Final reminders for you (the helper LLM)
 
 1. **Structure first, prose later.** Always scaffold files and label names *before* asking the user about content.
-2. **Default to the standard cascade** (§8). Only add custom guards when the user's persona explicitly requires.
+2. **Default to the standard cascade** (§9). Only add custom guards when the user's persona explicitly requires.
 3. **Use `LOCAL = 0` stubs liberally** — those slots fall back to engine defaults. Don't force the user to fill everything.
 4. **Always emit both `SUCCESS_COM` and `MESSAGE_COM`** for any command. Even if SUCCESS is just `TFLAG:192 = 0`.
 5. **Update `SOURCE:N:<slot>`** in counter / unique-counter handlers. Without it the kojo prints text but doesn't shift affection.

@@ -1,0 +1,11 @@
+# Private session notes — not for public repo
+my instructions.md
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.vscode/
+.idea/

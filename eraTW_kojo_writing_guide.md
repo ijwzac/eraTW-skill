@@ -51,6 +51,63 @@ For non-adult parts of kojo (most daily commands, events, info-screen, diary, ch
 
 The user may share their existing kojo or other characters' kojo for reference. **Read them for structure, not content.** Bodies that contain explicit prose: skim only enough to recognize the surrounding control flow and file role. Quote at most 1-2 lines of dialogue when essential.
 
+### 0.5 Most-common first-pass mistakes — read every time
+
+These are the bugs we see in nearly every first-pass kojo generation. Each one is detailed in its own section later, but you must hold them in your head while writing:
+
+1. **`@FOO(ARG, TYPE = 0)` will not compile.** Emuera only accepts positional `ARG / ARG:N / ARGS / ARGS:N` parameter names. Custom names like `TYPE`, `相手残機`, `OPTION` raise a Lv2 warning and the variable becomes unreadable inside the body. Use `@FOO(ARG, ARG:1 = 0)` and (optionally) `TYPE = ARG:1` as an alias on the first line of the body. → §3.1
+2. **`[[X]]` silently compiles to `0` when X is not in `STR.csv`.** Most character names — `[[アリス]]`, `[[ルナサ]]`, `[[メルラン]]`, `[[幽々子]]`, `[[ライコ]]`, etc. — are NOT in `STR.csv`, so `CASE [[ルナサ]]` becomes `CASE 0` and matches ARG=0 by accident. **Default to numeric IDs with comments**: `CASE 22  ;ルナサ`. Reserve `[[X]]` for names you've grep-confirmed in `STR.csv`. → §3.7
+3. **`MASTER`, `TARGET`, `PLAYER`, `ASSI` are bare identifiers, not `[[MASTER]]`.** Writing `[[MASTER]]` produces a warning. → §3.7
+4. **`@M_KOJO_EVENT_K{id}_1(ARG, ARG:1)` fires once PER CELL TRANSITION** the character makes anywhere on MASTER's current world map, not "once when entering MASTER's room." A char walking bedroom→corridor→dining will print 3 dialogue lines while MASTER is still asleep. **Mandatory first guard: `SIF CFLAG:{id}:現在位置 != CFLAG:MASTER:現在位置 / RETURN 0`.** Then branch on ARG sub-phase (1=MASTER walks in, 2=char walks in, 3-5=bath sub-phases). Same applies to `_2` (morning) and `_3` (sleep). → §2.4.1
+5. **`@M_KOJO_EVENT_K{id}_GRAVITY` is a SILENT NPC-AI movement attractor**, not a "gravity event." It fires every NPC-movement-decision tick (many times per turn). The body must set `TCVAR:{id}:引力点 = <location-code>` and **must not call any `PRINT*`**. → §2.4
+6. **`@M_KOJO_MESSAGE_COM_K{id}_00` fires on EVERY undefined cmd**, not "rarely." Default to `LOCAL = 0 / RETURN 0` (silent) unless you specifically want one identical line on every undefined cmd. → §2.4
+7. **`@M_KOJO_MESSAGE_MARKCNG_K{id}` fires after every action that *could* affect a mark**, not only on mark transitions. Body must guard `SIF !TFLAG:21 && !TFLAG:22 && !TFLAG:23 && !TFLAG:24 && !TFLAG:時姦刻印取得 / RETURN 0` before printing. → §2.4
+8. **`CFLAG:N:约会中` is a MAIN_MAP code, not a boolean.** After any first date, the slot is permanently non-zero. `IF CFLAG:N:约会中` is always-true thereafter. The canonical "currently dating with this character" predicate is `CHK_DATENOW(CFLAG:MASTER:约会中) && FLAG:约会的对象 == TARGET`. → §5.5
+9. **Slot names must match the actual CSV byte-for-byte.** This fork uses simplified-Chinese in many CFLAG names (`约会中`, `历史` etc.) — Japanese-kanji forms like `約会中` *do not resolve*. Some slot names that "look canonical" (`BASE:N:疲労`, `TFLAG:逢瀬時間`) **don't exist in this fork's CSVs**. → §0.6 verification pass
+10. **Files must be UTF-8 with BOM**, ideally CRLF. Without BOM, Chinese characters in some string contexts silently break. Write tools default to LF/no-BOM; prepend BOM after every write/edit. → §0.6
+11. **Display name in `CSV/Chara/Chara<N> *.csv` must match what your kojo prose calls the character.** The engine prints `%CALLNAME:N%` from CSV — if your prose calls her "莉莉卡" but the CSV says "莉莉喀", the player sees both inconsistently. Check `名前` and `呼び名` rows before authoring; edit CSV if you want a different display name. → §0.6
+12. **An early-return `IF` branch suppresses everything below it.** Bodies that gate broad conditions (room class, weather, time-of-day) at the top of a cascade will block all the rich relationship content for most of the game. RAND-gate broad conditions, or move them inside the relationship branches as flavor sub-conditions, instead of as early-return blockers.
+
+### 0.6 Verification pass (run before declaring done)
+
+After scaffolding a new kojo, before handing back to the user, verify:
+
+```bash
+# Adjust paths to match the user's install
+DIR="<kojo variant dir, e.g. ERB/口上・メッセージ関連/個人口上/100 Rei'sen [レイセン]/myvar>"
+CSVDIR="<root>/CSV"
+
+cd "$DIR"
+
+echo "=== [[ ]] symbols not in STR.csv (will silently become 0) ==="
+grep -hoE "\[\[[^]]+\]\]" *.ERB | sort -u | while read s; do
+    name="${s:2:-2}"
+    grep -qE ",${name}\b" "$CSVDIR/STR.csv" || echo "MISSING: $s"
+done
+
+echo "=== Custom-named function parameters (must be ARG/ARG:N/ARGS/ARGS:N only) ==="
+grep -nE "^@.*\([A-Za-z_][A-Za-z0-9_]*\s*=" *.ERB | \
+    grep -vE "ARG(:[0-9]+)?\s*=" | grep -vE "ARGS(:[0-9]+)?\s*="
+
+echo "=== Unverified CFLAG/TFLAG/TCVAR slot names (must exist in CSV) ==="
+grep -hoE "(CFLAG|TFLAG|TCVAR):([A-Z]+:)?[^a-z0-9 :,()<>=&|!*+\r\n_-]+\b" *.ERB | \
+    sed -E 's/^(CFLAG|TFLAG|TCVAR):([A-Z]+:)?//' | sort -u | while read slot; do
+    grep -qF ",${slot}" "$CSVDIR"/{CFLAG,TFLAG,TCVAR}.csv || echo "MISSING: $slot"
+done
+
+echo "=== Files missing UTF-8 BOM ==="
+for f in *.ERB; do
+    head -c 3 "$f" | xxd -p | grep -q "efbbbf" || echo "$f"
+done
+
+echo "=== EVENT_K_X bodies missing the same-cell guard ==="
+grep -l "@M_KOJO_EVENT_K[0-9]\+_[123](" *.ERB | while read f; do
+    grep -qE "現在位置.*!=.*MASTER:現在位置" "$f" || echo "$f: missing 現在位置 != MASTER:現在位置 guard"
+done
+```
+
+If any check fails, fix and re-run. **Re-run after every Edit pass** because tools sometimes strip BOM on rewrite.
+
 ---
 
 ## 1. The big picture
@@ -211,18 +268,28 @@ You only need to remember these. Anything not in this list is author-private (fi
 | `@M_KOJO[%RESULTS%_]ENCOUNTER_K{id}` | First time MASTER meets this character. |
 | `@M_KOJO[%RESULTS%_]SPEVENT_K{id}_{ev}(ARG, ARG:1)` | Scripted special event `ev`. ARG selects sub-state (0 = propose, 1 = accept, 2 = reject, etc). Body usually starts with `CALL SPEVENT_MESSAGE_{ev}(ARG, ARG:1)` to print the engine's default narration. |
 
-**Generic events**:
+**Generic events** (these PRINT message text):
+
 | Label | Args | What ARG means |
 |---|---|---|
-| `@M_KOJO[%RESULTS%_]EVENT_K{id}_{ev}(ARG, ARG:1)` | `ev` = engine event slot 1..30+ | Author-documented per slot. Common patterns: `1` = room encounter, `2` = morning, `3` = bedtime, `_ONABARE_<n>` = outburst, `_LOST_VIRGIN_STOP` = interrupt, `_PERMISSION_<n>` = push-down judge, `_GIFT` = gift reaction, `_GRAVITY` = gravity event. |
+| `@M_KOJO[%RESULTS%_]EVENT_K{id}_{ev}(ARG, ARG:1)` | `ev` = engine event slot 1..30+ | **`ev=1` is room/cell encounter — fires once per cell transition the char makes on the same world map, even if MASTER is in a different cell. Always guard the body with `SIF CFLAG:{id}:現在位置 != CFLAG:MASTER:現在位置 / RETURN 0` first, then branch on ARG sub-phase.** Common slots: `1` = room/cell encounter (sub-phases 1-5: see §2.4.1), `2` = morning, `3` = bedtime, `_ONABARE_<n>` = outburst, `_GIFT` = gift reaction. |
 | `@M_KOJO[%RESULTS%_]DAILY_EVENT_K{id}_{n}(ARG, ARG:1, ARG:2, ARG:3, ARG:4, ARGS:1, ARGS:2)` | 7-arg | Daily event with full state vector. |
+
+**Generic events that DO NOT print** (silent control-flow / state-machine; printing in their bodies will spam the player every tick):
+
+| Label | Args | Role |
+|---|---|---|
+| `@M_KOJO[%RESULTS%_]EVENT_K{id}_GRAVITY(ARG)` | 1-arg | **Silent NPC-AI movement attractor — NOT a flavor "gravity" event despite the name.** Engine fires this every NPC-movement-decision tick (many times per turn). Body MUST set `TCVAR:{id}:引力点 = <location-code>` to influence the AI's destination, and MUST NOT call any `PRINT*`. Default `TCVAR:{id}:引力点 = 0`. See K30 Eiki's `EVENT_K30_GRAVITY` for canonical pattern. |
+| `@M_KOJO[%RESULTS%_]EVENT_K{id}_LOST_VIRGIN_STOP(ARG)` | 1-arg | Silent. Body sets `TFLAG:中止破瓜` or similar to abort the virginity-loss flow. |
+| `@M_KOJO[%RESULTS%_]EVENT_K{id}_PERMISSION_<n>(ARG)` | 1-arg | Silent. Body decides push-down / advance consent and writes a result flag. |
+| `@K{id}_BEFORETRAIN` | none | Silent. Day-start per-character state-machine setup. Read `BASE/CFLAG/TCVAR`, write `CFLAG/TCVAR` flags that other bodies will branch on. |
 
 **Player commands**:
 | Label | Runs |
 |---|---|
 | `@M_KOJO[%RESULTS%_]SUCCESS_COM_K{id}_{cmd}` | Optional. Set `TFLAG:192` to override (-2 end / -1 fail / 0 default / 1 great-success). Otherwise just `TFLAG:192 = 0`. |
 | `@M_KOJO[%RESULTS%_]MESSAGE_COM_K{id}_{cmd}` | Per-command speech. **Convention**: starts with `CALL TRAIN_MESSAGE` (engine default narration) then `CALL <body_label>` to a `_<cmd>_1` body label. |
-| `@M_KOJO[%RESULTS%_]MESSAGE_COM_K{id}_00` | Catch-all fallback for any cmd this char handles. |
+| `@M_KOJO[%RESULTS%_]MESSAGE_COM_K{id}_00` | **Catch-all that fires on EVERY undefined cmd**, not a "rare" fallback. If you write rich body text here, the player sees it after every R18 / unimplemented command. Default to `LOCAL = 0 / RETURN 0` (silent fall-through to engine narration) UNLESS you specifically want one identical line on every undefined cmd. |
 | `@M_KOJO[%RESULTS%_]MESSAGE_SCOM_K{id}_{cmd}` | Sub-command (TFLAG:50-driven). For multi-person SCOM: `_<cmd>_1` is first participant, `_<cmd>_2` is second; engine swaps TARGET. |
 
 **Auto-counter / idle reactions**:
@@ -237,9 +304,9 @@ You only need to remember these. Anything not in this list is author-private (fi
 **Battle / quest / mark**:
 | Label | Notes |
 |---|---|
-| `@M_KOJO[%RESULTS%_]MESSAGE_COM_K{id}_DANMAKU(ARGS, 相手残機)` | Single label, scenes selected by `ARGS` string: `"戦闘前"`, `"ハンデ"`, `"被弾"`, `"残忍酷薄"`, `"乾坤一擲"`, `"怪力乱神"`, `"戦闘後"`. |
+| `@M_KOJO[%RESULTS%_]MESSAGE_COM_K{id}_DANMAKU(ARGS, ARG)` | Single label. **Use `ARG` as the second-arg name, not custom `相手残機`** — Emuera's compiler rejects custom param names; only `ARG/ARG:N/ARGS/ARGS:N` are valid. Annotate purpose with a comment: `;ARG = 相手残機 (opponent remaining lives)`. Some existing kojo (K5/K6/K7) bypass this with `(ARGS, 相手残機)` + `#DIM 相手残機` immediately after — that style works but produces a Lv2 warning at load time; the simple `(ARGS, ARG)` form is preferred for new kojo. Scenes selected by `ARGS` string: `"戦闘前"`, `"ハンデ"`, `"被弾"`, `"残忍酷薄"`, `"乾坤一擲"`, `"怪力乱神"`, `"戦闘後"`. |
 | `@M_KOJO[%RESULTS%_]IRAI_K{id}(ROLE, SCENE, IRAI_ID)` | Quest. `ROLE` ∈ `"CLIENT"/"TARGET"/"NO_REPORT"`. `SCENE` ∈ `"依頼提示時"/...・/"成功報告時"/"失敗報告時"`. |
-| `@M_KOJO[%RESULTS%_]MESSAGE_MARKCNG_K{id}` | After mark assigned. Engine sets `TFLAG:21..24` or `TFLAG:時姦刻印取得`. |
+| `@M_KOJO[%RESULTS%_]MESSAGE_MARKCNG_K{id}` | **Fires after EVERY action that *could* affect marks**, not only on actual mark transition. Body MUST guard with `SIF !TFLAG:21 && !TFLAG:22 && !TFLAG:23 && !TFLAG:24 && !TFLAG:時姦刻印取得 / RETURN 0` before printing anything, otherwise it spams a generic line after most actions. |
 
 **Diary**:
 | Label | Notes |
@@ -280,6 +347,54 @@ You only need to remember these. Anything not in this list is author-private (fi
 | `@KOJO_SF_CONTRACT_EVENT_K{id}(ARGS)` | "Sex friend" agreement. |
 | `@M_KOJO_CHECK_K{id}_IRAI_BLOCKED(ARGS, ARG, ARG:1)` | Quest-block predicate. |
 | `@M_KOJO_DIARYSETTING_K{id}(ARG)` | Diary state-set helper. |
+
+### 2.4.1 EVENT_K_X subphase reference (ARG values per slot)
+
+The engine fires several EVENT slots **multiple times per turn** with `ARG` distinguishing the sub-phase. **If you ignore ARG**, the body fires for every sub-phase (3-5 times per visit) and the dialogue prints repeatedly. Always branch on ARG, and `RETURN 0` from each branch (so other sub-phases can match).
+
+Authoritative ARG semantics (extracted from 001 Reimu / 霊夢 reference):
+
+**`@M_KOJO_EVENT_K{id}_1(ARG, ARG:1)` — room/cell encounter.** Fires once **per cell transition the character makes on the same world map** as MASTER, even if MASTER is in a different cell. **Mandatory first guard:**
+```erb
+@M_KOJO_EVENT_K{id}_1(ARG, ARG:1)
+LOCAL = 1
+SIF !LOCAL || FLAG:時間停止
+    RETURN 0
+;Engine fires this on every NPC cell-step. Reject when not co-located:
+SIF CFLAG:{id}:現在位置 != CFLAG:MASTER:現在位置
+    RETURN 0
+;Then branch on ARG sub-phase:
+SELECTCASE ARG
+    CASE 1   ;MASTER walks in, char already in room
+        ...
+        RETURN 0
+    CASE 2   ;char walks in, MASTER already in room
+        ...
+        RETURN 0
+    CASE 3   ;char enters bathroom while MASTER bathing — joins
+        ...
+        RETURN 0
+    CASE 4   ;char enters bathroom, exits politely
+        ...
+        RETURN 0
+    CASE 5   ;char enters bathroom, MASTER kicks them out
+        ...
+        RETURN 0
+ENDSELECT
+RETURN 0
+```
+
+**`@M_KOJO_EVENT_K{id}_2(ARG, ARG:1)` — morning.** Fires for every char on the same world-map as MASTER, every morning — even if char is in a different cell. **Same first guard required:**
+```erb
+SIF CFLAG:{id}:現在位置 != CFLAG:MASTER:現在位置
+    RETURN 0
+```
+
+**`@M_KOJO_EVENT_K{id}_3(ARG, ARG:1)` — bedtime.** Same map-vs-cell distinction as `_2`. Same guard required.
+
+For other EVENT slots (4..30+), check the corresponding body in 001 Reimu's kojo for ARG semantics; the pattern of "guard first, branch ARG, RETURN 0 per branch" applies universally.
+
+**Why this isn't obvious from the engine source**: the dispatcher in `KOJO_MESSAGE.ERB` doesn't filter by current-cell; it filters only by *map presence*. The cell check is the kojo's responsibility. Most reference kojo include this guard but they don't emphasize it — it has to be observed by reading them.
 
 ### 2.5 The MESSAGECHECK family — a powerful and easily-overlooked dispatch hook
 
@@ -432,11 +547,23 @@ LOCALS:1 = "world"
 #LOCALSIZE 200             ; expand local array
 ```
 
-**Default args**:
+**Default args** (positional only — Emuera does NOT allow custom parameter names):
 ```erb
-@MY_HELPER(ARG, TYPE = 0)
-;TYPE defaults to 0 if caller omits it
+@MY_HELPER(ARG, ARG:1 = 0)
+;ARG:1 defaults to 0 if caller omits it
+;          ─────────
+;          MUST be ARG / ARG:N / ARGS / ARGS:N — custom names like
+;          `TYPE`, `OPTION`, `相手残機` raise compile warning
+;          "参数错误:变量"X"未在此函数中定义" and the variable becomes
+;          unreadable inside the body.
+;
+;If you want named-style readability inside the body, alias at the top:
+;@MY_HELPER(ARG, ARG:1 = 0)
+;TYPE = ARG:1
+;... use TYPE freely below ...
 ```
+
+A few legacy kojo (K5, K6, K7) use the workaround `@FOO(ARGS, 相手残機)` followed by `#DIM 相手残機` immediately after — this compiles and runs but produces a Lv2 warning at load. Don't replicate that style for new kojo; use positional + alias.
 
 **Function markers** — for callable functions inside expressions:
 ```erb
@@ -546,7 +673,11 @@ RESETCOLOR
 
 ### 3.7 Special tokens
 
-- `[[<name>]]` — parse-time char-id lookup (e.g. `[[極]]` → 42). Requires the name to exist in `STR.csv`.
+- `[[<name>]]` — parse-time char-id lookup (e.g. `[[極]]` → 42). **Important quirks:**
+  - **`[[X]]` only resolves names in `CSV/STR.csv`**, NOT names in `CSV/Chara/Chara<N> *.csv`. Most character names you'd think to use (`[[アリス]]`, `[[ルナサ]]`, `[[メルラン]]`, `[[幽々子]]`, `[[ライコ]]`, etc.) **are not in STR.csv** even though their CSV files exist. They fail silently — `[[X]]` becomes literal `0` when unresolved, so `CASE [[ルナサ]]` becomes `CASE 0` and matches ARG=0.
+  - **`MASTER`, `TARGET`, `PLAYER`, `ASSI` are built-in numeric pseudo-constants** — write them bare, never as `[[MASTER]]` (which is wrong and produces a warning).
+  - **Recommended default**: use the numeric char ID with a comment explaining the ID, e.g. `CASE 22  ;ルナサ Lunasa`. This always works and is more readable when grepping. Reserve `[[X]]` for names you've verified are in `STR.csv` (mostly location names and a small set of major chars like `[[極]]`/`[[文]]`).
+  - **To verify** before using `[[X]]`: grep `STR.csv` for the exact name (byte-exact, including kanji-form). If it doesn't appear, fall back to numeric ID + comment.
 - `@"text"` — string literal supporting `//` line breaks.
 - `\n` inside a `DATAFORM` — line break.
 
@@ -579,12 +710,17 @@ Convention: `<NAMESPACE>:<CHAR_ID>:<SLOT>` (defaulting CHAR_ID to TARGET if omit
 
 ### 4.1 Per-character namespaces
 
+> **Important — slot names listed here are aspirational, not verified.** The eraTW corpus has multiple forks; some slot names are different on this fork (simplified-Chinese vs Japanese-kanji variants, slots that exist on one fork and not another). **Always grep the actual `CSV/<file>.csv` for byte-exact slot names before using them in code.** Concrete examples of mismatches we hit in practice:
+> - `约会中` (simplified 约) is the canonical CFLAG row; `約会中` (Japanese 約) does not resolve.
+> - `BASE:N:疲労` is *not* a slot in this fork's `CSV/Base.csv`. Use `BASE:N:気力 < MAXBASE:N:気力 / 2` as the canonical "tired" predicate.
+> - `TFLAG:逢瀬時間` is *not* in this fork's `CSV/TFLAG.csv`. There is no general "days since last met" TFLAG; use a private CFLAG slot you control (e.g. `CFLAG:N:1080 = DAY` and diff against today).
+
 | Namespace | What it stores | Notable slots |
 |---|---|---|
 | `TALENT:N:slot` | Talents (booleans, small ints). | `恋慕, 思慕, 恋人, 愛欲, 炮友, 処女, 無接吻経験, 兒童, 幼児／幼児退行, 年齢, 体型, 形状, 胸圍, 性別, 酒耐性, 妊娠, 育児中, 妊娠願望, 大胃王, 坦率, 自尊心, 無知, 小悪魔, 魅力, 魅惑, 謎之魅力, 膽怯, 傲慢, 叛逆, 施虐狂, 性別嗜好, 両面通吃, 讨厌男人, 態度, 非処女, 非童貞, 破瓜, Ａ破瓜, 出産経験, 膣射経験, 人妻, 未亡人, 接吻魔, 心情, …` |
 | `ABL:N:slot` | Ability ranks (-1..0..+5). | `親密, 欲望, Ｂ感覚, Ａ感覚, Ｃ感覚, Ｖ感覚, Ｐ感覚, Ｍ感覚, 従順, 奉仕精神, 教養, 料理技能, 戦闘能力, 露出癖, 接吻経験, 学習経験, 愛情経験, 約會経験, 演奏経験, 出産経験` |
 | `EXP:N:slot` | Experience counters (raw int). | `接吻経験, 料理経験, 愛情経験, 約會経験, 学習経験, 出産経験, 無自覚絶頂経験, 60..63` |
-| `BASE:N:slot` | Physiological base values. | `勃起, 体力, 酒気, 活力, 精神, 興奮, 疲労, 気力, 憤怒` |
+| `BASE:N:slot` | Physiological base values. **Verify in `CSV/Base.csv`.** | This fork's actual rows include: `体力, 気力, 射精, 母乳, 尿意, 勃起, 精力, 法力, TSP, 情緒, 理性, 憤怒, 工作量, 深度, 酒気, 潜伏率, 身高, 体重`. **No `疲労` slot — use `BASE:N:気力 < MAXBASE:N:気力 / 2` for "tired" instead.** |
 | `MAXBASE:N:slot` | Max base values. | (mirror of BASE). |
 | `NOWEX:N:slot` | Current physiological event state. | `射精, 噴乳, 放尿, Ｃ絶頂, Ｖ絶頂, Ｂ絶頂, Ａ絶頂, Ｍ絶頂, TotalEX` |
 | `EX:slot` | Engine-side cumulative state. | `膣内精液` |
@@ -692,7 +828,19 @@ GET_MAPID(loc)
 GET_TARGETNUM()                            ; chars in current room
 FINDCHARA(start_loc, current_loc)
 SHIRAHU(N)                                 ; char N in normal state
-CHK_DATENOW(CFLAG:N:約会中)                ; date currently underway
+CHK_DATENOW(CFLAG:N:约会中)                ; date currently underway (note simplified 约!)
+;
+; CRITICAL — `CFLAG:N:约会中` is NOT a boolean; it stores the MAIN_MAP code at
+; date start. After ANY date in this character's history, the slot holds that
+; map code (e.g. 5) and is NEVER auto-reset. So `IF CFLAG:N:约会中` is
+; effectively `IF 5` = always true after first date.
+;
+; The canonical "currently dating" predicate uses CHK_DATENOW (which compares
+; the stored map vs. current MAIN_MAP) AND verifies the partner:
+;     IF CHK_DATENOW(CFLAG:MASTER:约会中) && FLAG:约会的对象 == TARGET
+;
+; Anti-pattern (always-true after first date):
+;     IF CFLAG:TARGET:约会中               ;DON'T DO THIS
 CHK_FOCUS(start, current, end)             ; range check
 MASTER_POSE(role, ?, ?)                    ; multi-person scene id lookup
 ALCOHOL_TASTE(TFLAG:194), ALCOHOL_FACE()

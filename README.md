@@ -1,24 +1,67 @@
-# eraTW Kojo (口上) Writing Guide
+# eraTW-skill
 
-A reference for writing per-character dialogue/behavior scripts ("口上") for **eraTW** (era The World) — a [Touhou Project](https://en.touhouwiki.net/) text-RPG built on the [Emuera](https://gitlab.com/eraDB/Emuera) era-script engine.
+A [Claude Skill](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) for helping users write or modify per-character dialogue/behavior scripts ("口上"/kojo) for **eraTW** — a [Touhou Project](https://en.touhouwiki.net/) text-RPG built on the [Emuera](https://gitlab.com/eraDB/Emuera) era-script engine.
 
-## What's in this repo
+## Repo layout
 
-- **[`eraTW_kojo_writing_guide.md`](./eraTW_kojo_writing_guide.md)** — the main deliverable. A self-contained reference designed to be loaded into another LLM's context, so that LLM can help a human user write or modify a character's kojo. Covers dispatch contract, label catalog, DSL primer, state-bus, file taxonomy, workflow recipes, and a full character ID ⇆ name appendix.
-- **[`post_test_bugfixes_lyrica.md`](./post_test_bugfixes_lyrica.md)** — a real-world test report. After the guide was used to scaffold a Lyrica (K20) kojo, every bug found at runtime was logged here with root cause and a "guide gap" — what the guide *should* have said but didn't. This is the most valuable feedback artifact in the repo and drives ongoing improvements.
-- **`standalone_note_v1.md`, `standalone_note_v2.md`** — earlier consolidation passes that fed into the final guide. v2 is the more complete one.
-- **`notes_phase1_overview.md`** — initial scan of the eraTW codebase (CSV/ERB/dat layout, dispatcher mechanics).
-- **`notes_phase1_per_char/`** — line-by-line notes from reading four reference characters' kojo: 006 Luna (simplest), 042 Hatate (rich), 049 Satori (meta-content), 139 Tsukasa (clothing/wetness state).
-- **`subagent_findings.md`** — survey of ~149 character variant directories, looking for structural patterns the four samples missed.
+```
+eraTW-skill/
+├── eratw-skill/              ← the skill itself; copy this dir into ~/.claude/skills/
+│   ├── SKILL.md              ← entry point with YAML frontmatter
+│   └── references/           ← lazy-loaded supplementary docs + canonical CSVs
+│       ├── 01-engine-label-catalog.md
+│       ├── 02-state-bus-namespaces.md
+│       ├── 03-engine-helpers.md
+│       ├── 04-dsl-full.md
+│       ├── 05-event-arg-subphases.md
+│       ├── 06-workflow-recipes.md
+│       ├── 07-other-topics.md
+│       ├── 08-character-id-table.md
+│       ├── 09-persona-tips.md
+│       ├── 10-encoding-and-tools.md
+│       └── data/               ← canonical CSVs from a working eraTW install
+│           ├── README.md
+│           ├── Train.csv, CFLAG.csv, TFLAG.csv, …
+│           └── Chara/Chara<N> *.csv (~150 files)
+└── meta/                      ← session-internal artifacts (NOT for skill users)
+    ├── post_test_bugfixes_lyrica.md
+    ├── notes_phase1_*.md
+    ├── standalone_note_v[12].md
+    └── subagent_findings.md
+```
 
-## How to use the guide
+## How to use the skill
 
-The guide is intended for an LLM (Claude, GPT, Gemini, …) that is helping a non-technical user modify their game files. Drop it into the assistant's context (or convert to a [Claude Skill](https://docs.claude.com/en/agents-and-tools/agent-skills/overview)) and ask the assistant something like *"我想给 049 古明地觉 写一段下雪天的会话"*.
+### Claude Code
+
+Copy `eratw-skill/` (the inner directory, not the repo root) into `~/.claude/skills/`. Or symlink it. Or use a [plugin](https://docs.claude.com/en/agents-and-tools/agent-skills/distribute-skills) wrapper.
+
+```bash
+# Linux/macOS
+cp -r eratw-skill ~/.claude/skills/
+
+# Windows (PowerShell)
+Copy-Item -Recurse eratw-skill $env:USERPROFILE\.claude\skills\
+```
+
+Once installed, mention kojo / eraTW / a Touhou character / a `K<N>` label in any Claude Code session and the skill auto-activates. Claude reads SKILL.md and lazy-loads `references/*.md` and `references/data/*.csv` only as needed.
+
+### Generic chatbot (no file system, e.g. claude.ai web, ChatGPT, Gemini)
+
+Paste `eratw-skill/SKILL.md` into the chat as a system or context message. When the assistant needs more depth, it will name the specific reference file you should upload (e.g. *"Please upload `references/data/Train.csv`"*). Upload it; continue.
+
+The SKILL.md has a built-in mode-detection section (§0.4) that handles this gracefully.
 
 ## Status
 
-WIP. The guide produces correct first-pass output for *most* sections, but `post_test_bugfixes_lyrica.md` documents many concrete failure modes still being addressed. See that file for the current list of known guide gaps.
+WIP. Driven by real-world test feedback. The current version reflects bugs found while scaffolding a Lyrica (K20) kojo, logged in [`meta/post_test_bugfixes_lyrica.md`](./meta/post_test_bugfixes_lyrica.md).
+
+Known limitations:
+
+- The CSV data in `references/data/` comes from one specific fork. Other forks may differ.
+- The skill currently assumes a Chinese-speaking user; non-Chinese users would need to rewrite §0.3 of SKILL.md.
+- A canonical reference kojo (likely Reimu K1) is **not yet copied into the skill**. Future iteration: include `eratw-skill/reference-kojo/` with annotated excerpts from a complete working kojo, since the bugfix log shows an LLM scaffolding from scratch needs a worked example to mimic.
 
 ## License
 
-Documentation only; no code from the eraTW game itself is included. The game's own license and license-template files travel with each character's kojo directory under `ERB/口上・メッセージ関連/個人口上/`.
+Documentation only; no game code from eraTW itself is bundled. The game's own license travels with each character's kojo directory under `ERB/口上・メッセージ関連/個人口上/` in the actual game install.

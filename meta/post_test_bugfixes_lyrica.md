@@ -938,6 +938,80 @@ about the priority hazard.
 
 ---
 
+## Fix 15 — `M_KOJO_K20_日常系コマンド.ERB` cmd 300 condition #9 : `TIME:2` is NOT the hour bucket
+
+**Symptom (user-observed):** Condition #9 「深夜」 fires at 14:00
+(afternoon), 13:00, etc. — clearly not late-night times.
+
+**Root cause:** Guide §4.2 says:
+> | `TIME:2` | Hour bucket. |
+
+**This is wrong for this fork.** Inspecting `DEBUG.ERB:1368`, the
+canonical engine code for "current time" is:
+```erb
+PRINTFORML 现在时间是：{TIME/60}时{TIME%60}分
+```
+
+So:
+- `TIME` = minute-of-day (0-1439)
+- `TIME / 60` = **hour (0-23)** ← canonical
+- `TIME % 60` = minute
+- `TIME:2` = **some 0-7 range "time-phase code"**, not the hour
+
+Other kōjō confirm: K6 Luna uses `TIME:2 == 6` for "夜里"; K18 Lily
+uses `TIME:2 == 2` for "早上好哦", `TIME:2 == 3` for "中午好哦".
+These are tiny integers, not 0-23 hours.
+
+So my predicate `TIME:2 >= 23 || TIME:2 <= 3`:
+- `TIME:2 >= 23` is always false (TIME:2 max ~7)
+- `TIME:2 <= 3` matches phases 0/1/2/3 = morning/forenoon/noon/afternoon
+  → fires throughout the day, including 14:00
+
+**Diff:**
+```diff
+-IF (TIME:2 >= 23 || TIME:2 <= 3) && RAND:3 == 0
++IF (TIME / 60 >= 23 || TIME / 60 <= 3) && RAND:3 == 0
+```
+
+Also added debug-PRINTFORML for inspection:
+```erb
+;PRINTFORML [DBG-9] TIME={TIME} TIME/60={TIME/60} TIME%60={TIME%60} TIME:2={TIME:2}
+```
+
+**Guide gap (significant):**
+
+§4.2 globals table currently lists `TIME:2 = Hour bucket.` — this is
+flatly **wrong** in this fork. Suggested replacement:
+
+| Global | Means |
+|---|---|
+| `TIME` | Minute of day (0-1439). |
+| `TIME / 60` | **Hour (0-23) — canonical for hour-of-day comparisons.** |
+| `TIME % 60` | Minute (0-59). |
+| `TIME:0` | Same as `TIME` (alias). |
+| `TIME:2` | Time-phase code (~0-7); 6 = 夜, 2 = 早上, 3 = 中午, etc. **Do NOT use for hour comparisons; use `TIME / 60` instead.** |
+| `TIME:5` | Weather phase (4-7 = rain). |
+
+This bug is structurally similar to Fix 12 (`CFLAG:N:约会中` semantics
+mistaken for boolean): the guide names a slot, names a "purpose", but
+gets the actual numeric semantics wrong, so a naive predicate misfires.
+The lesson generalizes to many slots — **the guide should explicitly
+state the value DOMAIN of every named slot** (boolean / counter / map
+ID / phase code / minute / item ID / etc.) and provide a CANONICAL
+expression to obtain the commonly-needed derived value (hour from
+TIME, "currently dating" from CFLAG:约会中, etc.).
+
+A guide rewrite checklist:
+
+- For every slot mentioned in §4.1/§4.2: tag with [BOOLEAN] /
+  [COUNTER] / [PHASE-N] / [MAP-ID] / [ITEM-ID] / [TIMESTAMP].
+- For every "common derived value" (hour, "is on date", "is tired",
+  "is fertile", etc.): provide the canonical expression.
+- Cross-reference an authoritative source file (preferably an engine
+  helper definition) for each.
+
+---
+
 ## Things this LLM session got wrong but did NOT fix yet
 
 These were noticed during the bug-fix pass but left for later:

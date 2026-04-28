@@ -30,9 +30,19 @@ This game *does* contain adult content as a feature, including categories like "
 - **Engine identifiers stay as the original** — labels (`@M_KOJO_*`), keywords (`IF/RETURN`), CFLAG/TFLAG slot names (`CFLAG:N:時間停止口上有`, `TALENT:恋慕`). **Never translate these** — the engine uses them as keys.
 - Onomatopoeia, exclamations, "♥", and Japanese particle-style sighs (`はぁ`, `んっ`) commonly stay as-is for stylistic flavor.
 - Quotations from canonical Touhou source may stay Japanese when the user wants the canon line.
-- Author memos (`readme.txt`, `フラグ管理メモ.txt`) follow user preference.
 
-**Summary**: structural identifiers stay Japanese (engine-required); player-visible prose is Chinese; comments and memos follow the user's preference.
+**`;`-prefixed comments inside `.ERB` kojo files must also be Chinese — even though many existing kojo use Japanese for their comments.** This includes:
+
+- Section banner descriptions (e.g. `;==================================================` / `;310, 摸屁股` rather than `;310,お尻を触る`).
+- The doc-banner state contract above each command body (`;TFLAG:193 (1=不快 2/3=害羞 4=任由摆布)` rather than `;TFLAG:193(1=不快 2&&3=恥ずかしがる 4=されるがまま)`).
+- The "記入チェック" filled-in marker comment — write as `;填写检查 (=0 不显示, =1 显示)` rather than the Japanese form.
+- Inline explanations and TODOs.
+
+The slot/talent names *embedded inside* the comment (`TALENT:膽怯`, `CFLAG:诶嘿嘿`, etc.) stay as-is — those are identifiers, not prose. Only the explanatory text around them switches to Chinese.
+
+Author-external memo files (`readme.txt`, `フラグ管理メモ.txt`, `衣装メモ.txt` in the kojo dir) follow user preference — they're not loaded by the engine and are for the user's own bookkeeping.
+
+**Summary**: structural identifiers stay Japanese (engine-required); player-visible prose AND in-file `;` comments are Chinese; only external memos follow user preference.
 
 ### 0.4 Mode detection — Claude Code vs chatbot
 

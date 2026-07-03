@@ -1,0 +1,260 @@
+﻿;※※※※※※※※※※※※※※※※※※※※※※※※※
+;日常系指令
+;露娜：迟钝、爱讲理、头号胆小鬼；夜之妖精；消音能力；偷咖啡；爱摔跤。
+;※※※※※※※※※※※※※※※※※※※※※※※※※
+
+;==================================================
+;300,会話
+;TFLAG:193(1=大成功 0=成功 -1=失敗 -2=大失敗)
+;==================================================
+@M_KOJO_SUCCESS_COM_K6_300
+;成否判定 TFLAG:192(-2=终了 -1=强制失败 0=依指令 1=强制成功/大成功)
+TFLAG:192 = 0
+
+@M_KOJO_MESSAGE_MESSAGECHECK_COM_K6_300
+RETURN 0
+
+@M_KOJO_MESSAGE_COM_K6_300
+CALL TRAIN_MESSAGE
+CALL M_KOJO_MESSAGE_COM_K6_300_1
+RETURN RESULT
+
+@M_KOJO_MESSAGE_COM_K6_300_1
+;-------------------------------------------------
+;记入检查（=0 不显示，1 显示）
+LOCAL = 1
+;-------------------------------------------------
+IF LOCAL
+	IF FLAG:時間停止
+		;时停时（已开启 時間停止口上有）无意识地嘟囔
+		PRINTFORMW （静止的时间里，露娜维持着抱怨到一半的表情，连声音都被自己消掉了。）
+	ELSEIF CFLAG:6:睡眠
+		;睡眠时（未开眠奸口上则不会进来）
+	ELSEIF CFLAG:6:318 == 1
+		;极度闹别扭/无视
+		PRINTFORMW 「………」
+	ELSEIF TALENT:6:恋人
+		;tier5 恋人
+		SELECTCASE RAND:4
+			CASE 0
+				PRINTFORML 「稍微，等一下。」
+				PRINTFORML （露娜啪地打了个响指，四周的声音一下子全没了。）
+				PRINTFORMW 「这样……就只有我们两个人了。想说什么，都可以哦？」
+			CASE 1
+				PRINTFORML 「呐、%CALLNAME:MASTER%……夜里睡不着的时候，可以来找我哦。」
+				PRINTFORMW 「反正我本来就醒着嘛。……才、才不是特意等你呢。」
+			CASE 2
+				PRINTFORML 「你看你看，我把这颗会反光的小石头，摆在了窗边。」
+				PRINTFORMW 「等房间铺满这些，就是『地上的月亮』了。到时候……也分你一半好了。」
+			CASEELSE
+				PRINTFORML 「哈啊……和你在一起的时候，连抱怨都变少了。真奇怪。」
+				PRINTFORMW （露娜靠了过来，把头轻轻搁在%CALLNAME:MASTER%肩上。）
+		ENDSELECT
+	ELSEIF TALENT:6:愛欲 || TALENT:6:炮友
+		;tier4 爱欲/炮友
+		PRINTFORML 「光说话，多没意思呀。」
+		PRINTFORMW （露娜把周围的声音一收，凑到耳边，用只有两人能听见的音量说了句什么。）
+	ELSEIF TALENT:6:恋慕
+		;tier3 恋慕
+		SELECTCASE RAND:3
+			CASE 0
+				PRINTFORML 「那、那个——你不觉得我今天，有哪里不一样吗？」
+				PRINTFORMW （%CALLNAME:MASTER%仔细一看，她头发上系了一条崭新的黑丝带。被夸了一句，她整张脸都红透了。）
+			CASE 1
+				PRINTFORML 「斯塔给了我一朵没有刺的蔷薇，还说什么『露娜看不出这蔷薇没刺吗』……」
+				PRINTFORMW 「哈啊，那家伙到底在想什么，我完全搞不懂啦。」
+			CASEELSE
+				PRINTFORML 「我、我才不会因为%CALLNAME:MASTER%说两句话就高兴呢。」
+				PRINTFORMW （话是这么说，露娜的嘴角却怎么也压不下去。）
+		ENDSELECT
+	ELSEIF TALENT:6:思慕
+		;tier2 思慕（单行随机）
+		PRINTFORMW %TEXTR("「无聊的话……要不要，听我抱怨两句？」/「桑尼又搞砸了恶作剧，真是的。」/「人类的白天，太吵、也太亮了。」")%
+	ELSE
+		;tier1/0 中立
+		SELECTCASE RAND:3
+			CASE 0
+				PRINTFORML 「哼，人类找妖精搭话，可是很少见的。」
+				PRINTFORMW 「有话快说……我夜里才有精神，白天犯困着呢。」
+			CASE 1
+				PRINTFORML 「我可是光之三妖精里，最接近妖怪的月之妖精。」
+				PRINTFORMW 「所以……别、别小看我啊。（她一边说，一边悄悄往后退了半步。）」
+			CASEELSE
+				PRINTFORML 「你手里那杯，是咖啡吗？……没、没什么，我只是随口一问。」
+				PRINTFORMW （露娜的视线，却怎么也离不开那杯咖啡。）
+		ENDSELECT
+	ENDIF
+ENDIF
+RETURN 1
+
+;==================================================
+;301,泡茶（露娜其实更想要咖啡）
+;==================================================
+@M_KOJO_SUCCESS_COM_K6_301
+TFLAG:192 = 0
+
+@M_KOJO_MESSAGE_COM_K6_301
+CALL TRAIN_MESSAGE
+CALL M_KOJO_MESSAGE_COM_K6_301_1
+RETURN RESULT
+
+@M_KOJO_MESSAGE_COM_K6_301_1
+LOCAL = 1
+IF LOCAL
+	IF FLAG:時間停止
+	ELSEIF TALENT:6:恋人
+		PRINTFORMW 「谢谢——不过下次，能换成咖啡吗？煮咖啡是斯塔的拿手好戏，可我想喝你泡的。」
+	ELSEIF MARK:6:不埒刻印 == 3
+		PRINTFORMW 「……（露娜乖乖捧着茶杯，不敢像平时那样挑三拣四。）」
+	ELSE
+		PRINTFORMW 「茶啊……勉强收下吧。要是有咖啡豆，我可是会更高兴的哦？（暗示）」
+	ENDIF
+ENDIF
+RETURN 1
+
+;==================================================
+;302,身体接触（スキンシップ）
+;==================================================
+@M_KOJO_SUCCESS_COM_K6_302
+TFLAG:192 = 0
+
+@M_KOJO_MESSAGE_COM_K6_302
+CALL TRAIN_MESSAGE
+CALL M_KOJO_MESSAGE_COM_K6_302_1
+RETURN RESULT
+
+@M_KOJO_MESSAGE_COM_K6_302_1
+LOCAL = 1
+IF LOCAL
+	IF FLAG:時間停止
+	ELSEIF TALENT:6:恋人
+		PRINTFORMW 「唔……这样贴着，好安心。连夜里的失眠，好像都能好一点了。」
+	ELSE
+		PRINTFORML 「哇、哇！突、突然碰过来干什么啦！」
+		PRINTFORMW （露娜吓得往后一缩，脚下一绊，又是个漂亮的踉跄。）
+	ENDIF
+ENDIF
+RETURN 1
+
+;==================================================
+;309,摸头
+;==================================================
+@M_KOJO_SUCCESS_COM_K6_309
+TFLAG:192 = 0
+
+@M_KOJO_MESSAGE_COM_K6_309
+CALL TRAIN_MESSAGE
+CALL M_KOJO_MESSAGE_COM_K6_309_1
+RETURN RESULT
+
+@M_KOJO_MESSAGE_COM_K6_309_1
+LOCAL = 1
+IF LOCAL
+	IF FLAG:時間停止
+	ELSEIF TALENT:6:恋人
+		PRINTFORML 「唔……又、又把我当小孩子。」
+		PRINTFORMW （嘴上抱怨着，露娜却眯起眼睛，像只被顺了毛的小动物，主动把头往%CALLNAME:MASTER%手心里蹭。）
+	ELSE
+		PRINTFORML 「谁、谁准你摸的啦！我可是三妖精里最年长……大概吧！」
+		PRINTFORMW （她一边逞强，一边悄悄把声音消掉，好让别人听不见自己带着哭腔的抗议。）
+	ENDIF
+ENDIF
+RETURN 1
+
+;==================================================
+;311,拥抱（首次用 FIRSTTIME 演示）
+;==================================================
+@M_KOJO_SUCCESS_COM_K6_311
+TFLAG:192 = 0
+
+@M_KOJO_MESSAGE_COM_K6_311
+CALL TRAIN_MESSAGE
+CALL M_KOJO_MESSAGE_COM_K6_311_1
+RETURN RESULT
+
+@M_KOJO_MESSAGE_COM_K6_311_1
+LOCAL = 1
+IF LOCAL
+	;-------------------------------------------------
+	;初次（FIRSTTIME 子开关）
+	LOCAL:1 = 1
+	;-------------------------------------------------
+	IF LOCAL:1 && FIRSTTIME(SELECTCOM)
+		PRINTFORML 「诶——、诶诶！？抱、抱过来了！？」
+		PRINTFORMW （这是露娜第一次被人这样抱住。她僵在原地，慌得连消音都忘了，心跳声大得两个人都听得见。）
+		RETURN 1
+	ENDIF
+	IF FLAG:時間停止
+	ELSEIF TALENT:6:恋人
+		PRINTFORMW 「嘿嘿，抱紧点也没关系哦……反正声音我都消掉了，就算撒娇，也没人会知道。」
+	ELSEIF TALENT:6:恋慕
+		PRINTFORMW 「呜、呜哇，这么用力……心、心跳都要乱掉了啦……！」
+	ELSE
+		PRINTFORML 「放、放开我啦！妖精是不需要抱抱的！」
+		PRINTFORMW （话虽如此，她挣扎的力道，却小得几乎可以忽略。）
+	ENDIF
+ENDIF
+RETURN 1
+
+;==================================================
+;312,接吻（CALL ADD_KISS 计数；AddEXP 记接吻经验）
+;==================================================
+@M_KOJO_SUCCESS_COM_K6_312
+TFLAG:192 = 0
+
+@M_KOJO_MESSAGE_COM_K6_312
+CALL TRAIN_MESSAGE
+CALL M_KOJO_MESSAGE_COM_K6_312_1
+RETURN RESULT
+
+@M_KOJO_MESSAGE_COM_K6_312_1
+LOCAL = 1
+IF LOCAL
+	IF FLAG:時間停止
+	ELSEIF TALENT:6:恋人
+		PRINTFORML 「唔……♥ 这一下，连月光都要嫉妒了呢。」
+		PRINTFORMW （露娜意犹未尽地眨了眨那双红色的眼睛。）
+		CALL ADD_KISS
+		CALL AddEXP("接吻経験", 6, 5)
+	ELSEIF TALENT:6:恋慕
+		PRINTFORML 「诶——！？亲、亲上来了……！这、这种事要先说一声啊笨蛋！」
+		PRINTFORMW （一向迟钝的露娜，这次反应倒是快得出奇，只是快在了脸红上。）
+		CALL ADD_KISS
+		CALL AddEXP("接吻経験", 6, 3)
+	ELSE
+		PRINTFORML 「唔哇——！你、你干什么！」
+		PRINTFORMW （露娜猛地后退，一如既往地被自己的脚绊倒，一屁股坐在了地上。）
+	ENDIF
+ENDIF
+RETURN 1
+
+;==================================================
+;332,劝酒（三妖精平常也喝酒）
+;==================================================
+@M_KOJO_SUCCESS_COM_K6_332
+TFLAG:192 = 0
+
+@M_KOJO_MESSAGE_COM_K6_332
+CALL TRAIN_MESSAGE
+CALL M_KOJO_MESSAGE_COM_K6_332_1
+RETURN RESULT
+
+@M_KOJO_MESSAGE_COM_K6_332_1
+LOCAL = 1
+IF LOCAL
+	IF FLAG:時間停止
+	ELSEIF BASE:6:酒気 >= MAXBASE:6:酒気 / 2
+		PRINTFORML 「嗝——、再、再来一杯！夜、夜还长着呢……！」
+		PRINTFORMW （喝高了的露娜脸颊绯红，消音也时灵时不灵，抱怨声一阵大一阵小地飘出来。）
+	ELSE
+		PRINTFORMW 「喝酒？……偶尔陪你喝一点，也不是不行啦。反正我夜里也睡不着。」
+	ENDIF
+ENDIF
+RETURN 1
+
+;==================================================
+;_00 全未定义指令的兜底 —— 默认静默回退
+;==================================================
+@M_KOJO_MESSAGE_COM_K6_00
+LOCAL = 0
+RETURN 0

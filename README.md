@@ -8,26 +8,23 @@ A [Claude Skill](https://platform.claude.com/docs/en/agents-and-tools/agent-skil
 eraTW-skill/
 ├── eratw-skill/              ← the skill itself; copy this dir into ~/.claude/skills/
 │   ├── SKILL.md              ← entry point with YAML frontmatter
-│   └── references/           ← lazy-loaded supplementary docs + canonical CSVs
-│       ├── 01-engine-label-catalog.md
-│       ├── 02-state-bus-namespaces.md
-│       ├── 03-engine-helpers.md
-│       ├── 04-dsl-full.md
-│       ├── 05-event-arg-subphases.md
-│       ├── 06-workflow-recipes.md
-│       ├── 07-other-topics.md
-│       ├── 08-character-id-table.md
-│       ├── 09-persona-tips.md
-│       ├── 10-encoding-and-tools.md
-│       └── data/               ← canonical CSVs from a working eraTW install
-│           ├── README.md
-│           ├── Train.csv, CFLAG.csv, TFLAG.csv, …
-│           └── Chara/Chara<N> *.csv (~150 files)
-└── meta/                      ← session-internal artifacts (NOT for skill users)
+│   ├── references/           ← lazy-loaded supplementary docs + canonical CSVs
+│   │   ├── 01-engine-label-catalog.md … 10-encoding-and-tools.md
+│   │   ├── 11-autotest-pipeline.md   ← semi-automated kojo testing (DRAFT — dogfooding on Luna)
+│   │   └── data/             ← canonical CSVs from a working eraTW install
+│   │       ├── README.md, Train.csv, CFLAG.csv, TFLAG.csv, …
+│   │       └── Chara/Chara<N> *.csv (~150 files)
+│   ├── reference-kojo/       ← worked example kojo (label spec + filled examples)
+│   │   ├── 口上テンプレ/      ← official empty template (the doc-banners ARE the spec)
+│   │   ├── reimu/            ← filled-in worked example (K1)
+│   │   └── luna-K6/          ← modern, our-authored example (K6) + autotest tags (WIP)
+│   └── tools/
+│       └── clip_tap.ps1      ← live clipboard→transcript capture used by the test pipeline
+├── HANDOFF.md               ← session-continuity notes for the autotest-pipeline work
+└── meta/                    ← session-internal artifacts (NOT for skill users)
     ├── post_test_bugfixes_lyrica.md
-    ├── notes_phase1_*.md
-    ├── standalone_note_v[12].md
-    └── subagent_findings.md
+    ├── *_kojo_creation_log*.md   ← per-character build logs (Lyrica, Merlin, …)
+    └── notes_phase1_*.md, standalone_note_v[12].md, subagent_findings.md
 ```
 
 ## How to use the skill
@@ -60,7 +57,8 @@ Known limitations:
 
 - The CSV data in `references/data/` comes from one specific fork. Other forks may differ.
 - The skill currently assumes a Chinese-speaking user; non-Chinese users would need to rewrite §0.3 of SKILL.md.
-- A canonical reference kojo (likely Reimu K1) is **not yet copied into the skill**. Future iteration: include `eratw-skill/reference-kojo/` with annotated excerpts from a complete working kojo, since the bugfix log shows an LLM scaffolding from scratch needs a worked example to mimic.
+- `reference-kojo/` now ships the official empty template (口上テンプレ), a filled worked example (reimu/K1), and an in-progress modern example (luna-K6) — the last is a live testbed for the autotest pipeline.
+- The **autotest pipeline** (`references/11-autotest-pipeline.md`) is a **draft**: a semi-automated way to drive the game and verify a kojo's dialogue. It's being validated end-to-end on the fresh Luna (K6) kojo before being folded into the main SKILL flow. See [`HANDOFF.md`](./HANDOFF.md) for the current state of that work.
 
 ## License
 

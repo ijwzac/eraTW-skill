@@ -1,0 +1,78 @@
+﻿;※※※※※※※※※※※※※※※※※※※※※※※※※
+;日记（翻看日记本 = 指令 406）
+;露娜的「深夜笔记」——迟钝、爱抱怨、字迹潦草，还沾着咖啡渍。
+;※※※※※※※※※※※※※※※※※※※※※※※※※
+
+;### 日记存在判定 ###
+@DIARY_K6_EXIST
+RETURN 1
+
+;### 读取前检查：设定总页数与各页解锁条件 ###
+@DIARY_BEFORE_CHECK_K6
+;总页数（页码从 0 起，共 3 页）
+MAX_DIARY_PAGE:6:0 = 2
+;解锁：面识后可读第 0 页；好感够读第 1 页；恋慕/恋人才读到第 2 页
+DIARY:6:0 = CFLAG:6:面識
+DIARY:6:1 = (CFLAG:6:好感度 >= 500)
+DIARY:6:2 = (TALENT:6:恋慕 || TALENT:6:恋人)
+RETURN 1
+
+;### 日记正文 ###
+@DIARY_TEXT_K6(PAGENUM, MODE, PAGECOUNT)
+#DIM PAGENUM
+#DIMS MODE
+#DIM PAGECOUNT
+SELECTCASE PAGENUM
+	CASE 0
+		PRINTFORML ◇ 露娜的深夜笔记 ◇
+		IF MODE == "指令"
+			PRINTFORML （字迹歪歪扭扭，还沾着几个像是咖啡渍的圆点。）
+		ELSE
+			PRINTFORML
+		ENDIF
+	CASE 1
+		PRINTFORML ◇ 关于恶作剧和那两个人 ◇
+		PRINTFORML 今天桑尼的计划又失败了。明明是她自己迷路的，凭什么怪到我头上。
+		PRINTFORML 斯塔在旁边一边煮咖啡一边看笑话。……那杯咖啡真香。（分我一点会怎样嘛。）
+		PRINTFORMW 殿后又是我。每次落单被抓的也是我。真是的，明明是不死的妖精，怎么净受这种委屈。
+	CASE 2
+		PRINTFORML ◇ 关于%CALLNAME:MASTER% ◇
+		IF TALENT:6:恋人
+			PRINTFORML 夜里睡不着的时候，只要想到那个人，胸口就会变得暖暖的。
+			PRINTFORMW ……这算什么呀，真不像我。明明我可是最冷酷的月之妖精呢。（笨蛋。晚安。）
+		ELSE
+			PRINTFORML 那个人类，是个不错的观众。至少他不会像桑尼那样，把我的失败拿去到处说。
+			PRINTFORMW 下次……要给他看看，我最帅气的那片弹幕。（才、才不是想被夸呢。）
+		ENDIF
+	CASEELSE
+		PRINTFORML （这一页是空白的，只画着一个随手涂的、歪歪的月亮。）
+ENDSELECT
+RETURN 1
+
+;### 读取后检查 ###
+@DIARY_AFTER_CHECK_K6
+RETURN 1
+
+;==================================================
+;406,翻看日记本
+;==================================================
+@M_KOJO_SUCCESS_COM_K6_406
+TFLAG:192 = 0
+
+@M_KOJO_MESSAGE_COM_K6_406
+CALL TRAIN_MESSAGE
+CALL M_KOJO_MESSAGE_COM_K6_406_1
+RETURN RESULT
+
+@M_KOJO_MESSAGE_COM_K6_406_1
+LOCAL = 1
+IF LOCAL
+	IF TALENT:6:恋人
+		PRINTFORML 「诶——！？那、那个不许看啦！里面……写了好多关于你的事呢！」
+		PRINTFORMW （露娜慌忙去抢，脚下照例一绊，连同日记本一起扑进了%CALLNAME:MASTER%怀里。）
+	ELSE
+		PRINTFORML 「喂喂，偷看女孩子的日记，可不是绅士的行为哦。」
+		PRINTFORMW 「……不过，反正你也看不懂我的字。哼，随便你啦。」
+	ENDIF
+ENDIF
+RETURN 1

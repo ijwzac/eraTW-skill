@@ -1,0 +1,20 @@
+﻿;※※※※※※※※※※※※※※※※※※※※※※※※※
+;刻印取得时的反应（MARKCNG）
+;※※※※※※※※※※※※※※※※※※※※※※※※※
+@M_KOJO_MESSAGE_MARKCNG_K6
+;★守卫：只有确实取得某种刻印的那一拍才念（pitfall #7）
+SIF !TFLAG:21 && !TFLAG:22 && !TFLAG:23 && !TFLAG:24 && !TFLAG:時姦刻印取得
+	RETURN 0
+IF TFLAG:時姦刻印取得
+	PRINTFORMW （在静止的时间里，某种印记悄无声息地刻进了露娜体内——就连一向依赖「声音」的她，都毫无察觉。）
+ELSEIF MARK:6:快楽刻印 >= 1
+	PRINTFORMW 「唔……身体，好像被调成了奇怪的音……好、好过分，怎么可以让妖精变成这样……」
+ELSEIF MARK:6:不埒刻印 >= 1
+	PRINTFORMW 「……连这种地方，都开始听你的话了。明明，我可是最爱讲理的呀……」
+ELSEIF MARK:6:反発刻印 >= 1
+	PRINTFORML 「哼！别得意！这点程度，才、才降伏不了月之妖精呢！」
+	PRINTFORMW （露娜梗着脖子，把周围的声音一收，好把自己发颤的语尾藏起来。）
+ELSE
+	PRINTFORMW （露娜的神情，似乎起了某种微妙的变化。）
+ENDIF
+RETURN 1

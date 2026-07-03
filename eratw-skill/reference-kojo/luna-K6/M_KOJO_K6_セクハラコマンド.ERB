@@ -1,0 +1,49 @@
+﻿;※※※※※※※※※※※※※※※※※※※※※※※※※
+;性骚扰系指令
+;310 摸屁股 = 轻度 SFW 反应（露娜恼羞成怒）；353 猥褻 = 结构桩（LOCAL=0，待填）
+;※※※※※※※※※※※※※※※※※※※※※※※※※
+
+;==================================================
+;310,摸屁股
+;==================================================
+@M_KOJO_SUCCESS_COM_K6_310
+TFLAG:192 = 0
+
+@M_KOJO_MESSAGE_MESSAGECHECK_COM_K6_310
+RETURN 0
+
+@M_KOJO_MESSAGE_COM_K6_310
+CALL TRAIN_MESSAGE
+CALL M_KOJO_MESSAGE_COM_K6_310_1
+RETURN RESULT
+
+@M_KOJO_MESSAGE_COM_K6_310_1
+LOCAL = 1
+IF LOCAL
+	IF FLAG:時間停止
+	ELSEIF TALENT:6:恋人 || TALENT:6:炮友
+		PRINTFORMW 「呀……！真、真是的，趁没人的时候才敢……哼，只、只准这一次哦。」
+	ELSE
+		PRINTFORML 「呜哇——！你、你摸哪里啊笨蛋——！」
+		PRINTFORMW （露娜羞得满脸通红，慌乱后退，果不其然又被自己的脚绊了个正着。）
+	ENDIF
+ENDIF
+RETURN 1
+
+;==================================================
+;353,猥褻 —— 结构桩（LOCAL=0，回退默认地文）
+;==================================================
+@M_KOJO_SUCCESS_COM_K6_353
+TFLAG:192 = 0
+
+@M_KOJO_MESSAGE_COM_K6_353
+CALL TRAIN_MESSAGE
+CALL M_KOJO_MESSAGE_COM_K6_353_1
+RETURN RESULT
+
+@M_KOJO_MESSAGE_COM_K6_353_1
+;TODO(用户填写)：猥褻指令台词。SFW 版本保留为静默桩。
+LOCAL = 0
+IF LOCAL
+ENDIF
+RETURN 1

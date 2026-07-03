@@ -1,0 +1,16 @@
+﻿;※※※※※※※※※※※※※※※※※※※※※※※※※
+;加虐系指令 —— 结构桩（SFW 版本留 LOCAL=0）
+;命令号：100 打屁股（其余 101-108 由玩家按需扩充）
+;TODO(用户填写)：如需加虐内容，改 LOCAL=1 并填写台词。
+;※※※※※※※※※※※※※※※※※※※※※※※※※
+
+@M_KOJO_SUCCESS_COM_K6_100
+TFLAG:192 = 0
+@M_KOJO_MESSAGE_COM_K6_100
+CALL M_KOJO_MESSAGE_COM_K6_100_1
+RETURN RESULT
+@M_KOJO_MESSAGE_COM_K6_100_1
+LOCAL = 0
+IF LOCAL
+ENDIF
+RETURN 1

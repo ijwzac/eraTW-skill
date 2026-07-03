@@ -16,11 +16,27 @@ CALL ADD_KISS                       ; increment kiss counter
 ### 5.2 UI prompts
 
 ```erb
+CALL ASK_YN                            ; default labels: [0] はい / [1] いいえ
 CALL ASK_YN("yes-text", "no-text")    ; sets RESULT to 0 (yes) or 1 (no) — note polarity
 CALL ASK_M("opt0", w0, "opt1", w1, …) ; multi-choice; w=0 grey-out, w=1 enable; RESULT = idx
 INPUT                                  ; read int → RESULT
 INPUTS                                 ; read str → RESULTS
 PRINTBUTTON @"label", @"return-string"
+```
+
+`ASK_YN` / `ASK_M` both loop internally on invalid input — you don't need to wrap them in your own input-loop. `ASK_M`'s per-option weight expressions become greyed-out (unselectable) when falsy:
+
+```erb
+CALL ASK_M("买",     MONEY >= 1000,       \
+           "不买",   1,                     \
+           "撒娇",   TALENT:MASTER:謎の魅力,\
+           "抢走",   ABL:MASTER:戦闘能力 >= 3)
+SELECTCASE RESULT
+    CASE 0    ;bought
+    CASE 1    ;refused
+    CASE 2    ;coaxed
+    CASE 3    ;stole
+ENDSELECT
 ```
 
 ### 5.3 Image / face / talk
@@ -95,6 +111,19 @@ CSVCALLNAME(client_id)
 GET_GIFTDATA(item_id, "得点")
 CHARA_DIARY_PAGESETTING(char, page)
 ```
+
+### 5.6.1 Convenience text + EXP
+
+```erb
+%TEXTR("A/B/C")%                           ; inline random-text variant (use inside PRINTFORM*)
+%TEXTR("A/B/C/")%                          ; trailing slash adds an empty-string option
+CALL HPH_PRINT(@"text with HPH ♥", "L")    ; print text where HPH expands to a pink heart; mode "L"/"W"/"D" sets wait
+CALL AddEXP("<exp-slot>", <char>, <delta>) ; equivalent to `EXP:<char>:<slot> += <delta>` + auto yellow-color "X +N (callname)" message
+```
+
+Use `AddEXP` instead of manually `EXP:N:slot += K / SETCOLOR / PRINTFORMW / RESETCOLOR` — shorter and cannot misspell the yellow color constant.
+
+`TEXTR` is lighter-weight than `SELECTCASE RAND:N` when each alternative is a single short phrase. Reserve SELECTCASE for branches with multiple lines or side-effects.
 
 ### 5.7 Author-helper conventions
 

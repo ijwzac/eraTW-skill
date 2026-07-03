@@ -1,0 +1,56 @@
+﻿;※※※※※※※※※※※※※※※※※※※※※※※※※
+;反应（カウンター）——待机/被动时的自动反应
+;※※※※※※※※※※※※※※※※※※※※※※※※※
+
+@M_KOJO_MESSAGE_COUNTER_K6_1
+;记入检查
+LOCAL = 1
+IF LOCAL
+	IF TALENT:6:恋人 || TALENT:6:恋慕
+		SELECTCASE RAND:3
+			CASE 0
+				PRINTFORML 「呐、别老盯着桑尼那边看啦……看、看我这边一点会怎么样嘛。」
+				PRINTFORMW （露娜悄悄把%CALLNAME:MASTER%周围的声音消掉，好让这句抱怨只有他一个人听得见。）
+			CASE 1
+				PRINTFORMW 「哈啊……和你在一起的话，连漫长的夜晚，都好像没那么难熬了。」
+			CASEELSE
+				PRINTFORMW 「喂——、发什么呆呀。人类的白天已经够无聊了，别连你也犯困啊。」
+		ENDSELECT
+		SOURCE:6:情愛 += 60
+	ELSE
+		SELECTCASE RAND:2
+			CASE 0
+				PRINTFORMW 「……你要是没事，我可要去找桑尼和斯塔了哦。三个人一起，才好恶作剧嘛。」
+			CASEELSE
+				PRINTFORMW 「哼，别以为消了音我就听不见你的心里话——才怪，我可没有那种能力啦。」
+		ENDSELECT
+		SOURCE:6:歓楽 += 40
+	ENDIF
+ENDIF
+RETURN 1
+
+;※※※※※※※※※※※※※※※※※※※※※※※※※
+;固有反应（固有カウンター）——露娜专属：不自觉地消音嘀咕
+;※※※※※※※※※※※※※※※※※※※※※※※※※
+@UNIQUE_COUNTER1_ABLE_K6
+;时停时不触发；欲望够高才会「忍不住」
+SIF FLAG:時間停止
+	RETURN 0
+SIF ABL:6:欲望 < 2
+	RETURN 0
+RETURN 1
+
+@UNIQUE_COUNTER1_FREQUENCY_K6
+;出现频率（数值越小越频繁），并设置菜单名
+RESULTS = 消音嘀咕
+RETURN 14
+
+@UNIQUE_COUNTER1_MESSAGE_K6
+PRINTFORML 露娜以为神不知鬼不觉地打了个响指，把四周的声音悄悄消掉。
+PRINTFORML 「……（叽里咕噜地抱怨着什么，可惜一个字也传不出来。）」
+PRINTFORMW （只是她大概忘了，消音是「双向」的——此刻的她，也听不见%CALLNAME:MASTER%正憋着笑。）
+RETURN 1
+
+@UNIQUE_COUNTER1_SOURCE_K6
+SOURCE:6:歓楽 += 120
+RETURN 1

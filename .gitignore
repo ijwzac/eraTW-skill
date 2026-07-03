@@ -9,3 +9,7 @@ Thumbs.db
 *~
 .vscode/
 .idea/
+
+# Large scraped source material — keep local, not in the public repo
+meta/*.pdf
+meta/*_wiki*.txt

@@ -1,9 +1,10 @@
 # EVENT_K_X subphase reference (ARG semantics per slot)
 
+**For the complete ARG-map table covering all 34 EVENT slots, see `01-engine-label-catalog.md` §2.4.2.** This file zooms in on the slots where the cell-guard pattern is critical (slots 1/2/3) and explains *why* the pattern is mandatory.
 
 The engine fires several EVENT slots **multiple times per turn** with `ARG` distinguishing the sub-phase. **If you ignore ARG**, the body fires for every sub-phase (3-5 times per visit) and the dialogue prints repeatedly. Always branch on ARG, and `RETURN 0` from each branch (so other sub-phases can match).
 
-Authoritative ARG semantics (extracted from 001 Reimu / 霊夢 reference):
+Authoritative ARG semantics (cross-checked between `001 Reimu / 霊夢` filled-in kojo, the official empty template `reference-kojo/口上テンプレ/M_KOJO_KX_イベント.ERB`, and `口上作者様へ.txt`):
 
 **`@M_KOJO_EVENT_K{id}_1(ARG, ARG:1)` — room/cell encounter.** Fires once **per cell transition the character makes on the same world map** as MASTER, even if MASTER is in a different cell. **Mandatory first guard:**
 ```erb
@@ -43,7 +44,7 @@ SIF CFLAG:{id}:現在位置 != CFLAG:MASTER:現在位置
 
 **`@M_KOJO_EVENT_K{id}_3(ARG, ARG:1)` — bedtime.** Same map-vs-cell distinction as `_2`. Same guard required.
 
-For other EVENT slots (4..30+), check the corresponding body in 001 Reimu's kojo for ARG semantics; the pattern of "guard first, branch ARG, RETURN 0 per branch" applies universally.
+For other EVENT slots (4..34), see the table in `01-engine-label-catalog.md` §2.4.2 — most don't need the cell-guard (they're already gated by the trigger), but the pattern of "branch ARG, RETURN 0 per branch" applies universally for any slot where ARG has multiple values.
 
 **Why this isn't obvious from the engine source**: the dispatcher in `KOJO_MESSAGE.ERB` doesn't filter by current-cell; it filters only by *map presence*. The cell check is the kojo's responsibility. Most reference kojo include this guard but they don't emphasize it — it has to be observed by reading them.
 

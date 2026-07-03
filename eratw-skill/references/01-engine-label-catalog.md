@@ -26,16 +26,21 @@ You only need to remember these. Anything not in this list is author-private (fi
 
 | Label | Args | What ARG means |
 |---|---|---|
-| `@M_KOJO[%RESULTS%_]EVENT_K{id}_{ev}(ARG, ARG:1)` | `ev` = engine event slot 1..30+ | **`ev=1` is room/cell encounter — fires once per cell transition the char makes on the same world map, even if MASTER is in a different cell. Always guard the body with `SIF CFLAG:{id}:現在位置 != CFLAG:MASTER:現在位置 / RETURN 0` first, then branch on ARG sub-phase.** Common slots: `1` = room/cell encounter (sub-phases 1-5: see §2.4.1), `2` = morning, `3` = bedtime, `_ONABARE_<n>` = outburst, `_GIFT` = gift reaction. |
-| `@M_KOJO[%RESULTS%_]DAILY_EVENT_K{id}_{n}(ARG, ARG:1, ARG:2, ARG:3, ARG:4, ARGS:1, ARGS:2)` | 7-arg | Daily event with full state vector. |
+| `@M_KOJO[%RESULTS%_]EVENT_K{id}_{ev}(ARG, ARG:1)` | `ev` = engine event slot 1..34 (full ARG map: §2.4.2; cell-guard rationale: §2.4.1) | **`ev=1` is room/cell encounter — fires once per cell transition the char makes on the same world map, even if MASTER is in a different cell. Always guard the body with `SIF CFLAG:{id}:現在位置 != CFLAG:MASTER:現在位置 / RETURN 0` first, then branch on ARG sub-phase.** |
+| `@M_KOJO[%RESULTS%_]EVENT_K{id}_GIFT(ARG, GIFT_ID, 評価点, GIFT_NAME, SENSE)` | 5-arg | Gift event. Body must `#DIM GIFT_ID / #DIM 評価点 / #DIMS GIFT_NAME / #DIMS SENSE` on first four lines. **ARG values**: 1 = date-return gift (701-999 score, intimacy 5+ required), 2 = end-of-day "treasure" (≥700), 3 = "favorite" (≥700 + highest score), 4 = "store away" (400-699), 5 = "secretly pawn" (<400). Use `STRCOUNT(SENSE, "<token>/")` to test gift-property tags. `GET_GIFTDATA(GIFT_ID, "<key>")` exposes 回数 / 得点 / 日付 / 場所 / 形容詞 / 本体. |
+| `@M_KOJO[%RESULTS%_]DAILY_EVENT_K{id}_{n}(ARG, ARG:1, ARG:2, ARG:3, ARG:4, ARGS:1, ARGS:2)` | 7-arg | Daily event with full state vector. Known slots: `_2` = 夢精 (wet dream — happens when MASTER has 濃厚精液 talent), `_4` = 物思い (pondering — auto-triggers at intimacy ≥5 for visiting chars), `_12` = 特訓 (combat training — at 信頼 ≥100 for residents; `ARG:1` is sub-step 1=request/2=decline/3=attack/4=evade/5=evade-fail). Pair with `@M_KOJO_DAILY_EVENT_MESSAGECHECK_K{id}_{n}` to suppress engine narration when overriding. |
+| `@M_KOJO[%RESULTS%_]EVENT_K{id}_ONABARE_1(ARG)` | 1-arg | Optional override: replaces engine's default "MASTER discovers TARGET masturbating" narration. `ARG = 1` if Anal, else V. Wrap in `[SKIPSTART]/[SKIPEND]` if not used (template default). |
+| `@M_KOJO[%RESULTS%_]EVENT_K{id}_ONABARE_2(ARG)` | 1-arg | Optional override: replaces engine's "TARGET continues anyway" narration. Same ARG semantics as `_1`. |
+| `@M_KOJO[%RESULTS%_]EVENT_K{id}_ONABARE_3(前戯１, 本番はどっちか, 回数, 注入量)` | 4-arg | Optional override: replaces engine's "MASTER joins in" 4-step narration. Custom param names; body must `#DIM 前戯１ / #DIM 本番はどっちか / #DIM 回数 / #DIM 注入量` on first four lines (per §1 pitfall #1). `前戯１`: 1=C/2=B/3=M responsiveness. `本番はどっちか`: 0=V, 1=A. |
+| `@M_KOJO[%RESULTS%_]EVENT_K{id}_26_1(ARGS)` | 1-arg string | Pre-judgment for `EVENT_K{id}_26` (オナバレ caught-masturbating) action choice. `ARGS` is the player-chosen action ("どうぞそのまま" / "二人で" / ...). **Return contract**: `RETURN -1` to force-fail the action, `RETURN 1` to force-succeed, `RETURN 0` to use engine's normal judgment. |
 
 **Generic events that DO NOT print** (silent control-flow / state-machine; printing in their bodies will spam the player every tick):
 
 | Label | Args | Role |
 |---|---|---|
 | `@M_KOJO[%RESULTS%_]EVENT_K{id}_GRAVITY(ARG)` | 1-arg | **Silent NPC-AI movement attractor — NOT a flavor "gravity" event despite the name.** Engine fires this every NPC-movement-decision tick (many times per turn). Body MUST set `TCVAR:{id}:引力点 = <location-code>` to influence the AI's destination, and MUST NOT call any `PRINT*`. Default `TCVAR:{id}:引力点 = 0`. See K30 Eiki's `EVENT_K30_GRAVITY` for canonical pattern. |
-| `@M_KOJO[%RESULTS%_]EVENT_K{id}_LOST_VIRGIN_STOP(ARG)` | 1-arg | Silent. Body sets `TFLAG:中止破瓜` or similar to abort the virginity-loss flow. |
-| `@M_KOJO[%RESULTS%_]EVENT_K{id}_PERMISSION_<n>(ARG)` | 1-arg | Silent. Body decides push-down / advance consent and writes a result flag. |
+| `@M_KOJO[%RESULTS%_]EVENT_K{id}_LOST_VIRGIN_STOP(ARG)` | 1-arg | Silent. **Prerequisite**: `CFLAG:{id}:破瓜中止口上有 = 1` must be set in `FLAGSETTING_K{id}`, otherwise this label is never dispatched. **Body return contract**: `RETURN 1` to abort the virginity-loss flow, `RETURN 0` (or fall through) to proceed normally. (Engine reads `RESULT == 1` after dispatch via `TRACHECK_LOST_VIRGIN.ERB:392-399`. There is no `TFLAG:中止破瓜` slot.) |
+| `@M_KOJO[%RESULTS%_]EVENT_K{id}_PERMISSION_<n>(ARG)` | 1-arg | Silent. Two slots: `PERMISSION_1` = first push-down attempt, `PERMISSION_2` = consensual push-down. **Prerequisites**: `CFLAG:{id}:口上内抱き寄せ判定_初回 = 1` for `_1`, `CFLAG:{id}:口上内抱き寄せ判定_通常 = 1` for `_2` — must be set in `FLAGSETTING_K{id}`, otherwise the body is never dispatched. **Body return contract**: `RETURN -1` = refuse (force abort), `RETURN 0` = use engine's normal judgment, `RETURN 1` = unconditional success (force allow). See `007 Star [スター]/スターサファイア/M_KOJO_K7_イベント.erb:4658-4677` for the canonical comment block documenting these. |
 | `@K{id}_BEFORETRAIN` | none | Silent. Day-start per-character state-machine setup. Read `BASE/CFLAG/TCVAR`, write `CFLAG/TCVAR` flags that other bodies will branch on. |
 
 **Player commands**:
@@ -67,7 +72,7 @@ You only need to remember these. Anything not in this list is author-private (fi
 |---|---|
 | `@DIARY_K{id}_EXIST` | Returns 1 to claim diary support. |
 | `@DIARY_BEFORE_CHECK_K{id}` | Updates `DIARY:N:M` slot states based on game state. |
-| `@DIARY_TEXT_K{id}, PAGENUM, MODE, PAGECOUNT` | Body. `MODE` ∈ `"デイリー"` (auto end-of-day) / `"指令"` (command 406). |
+| `@DIARY_TEXT_K{id}, PAGENUM, MODE, PAGECOUNT` | Body. `MODE` ∈ `"デイリー"` (auto end-of-day) / `"指令"` (command 406). **Body must declare these custom-named parameters with `#DIM PAGENUM` / `#DIMS MODE` / `#DIM PAGECOUNT` on the first three lines after the `@` header**, otherwise Emuera raises 警告Lv2 ("variable not defined in this function") at load and reads from the variables fail. This is the same Emuera rule as §1 pitfall #1 — see also `006 Luna [ルナ]/ルナチャイルド/M_KOJO_K6_日記.ERB:340-349` for the canonical pattern. |
 | `@DIARY_AFTER_CHECK_K{id}` | Per-day cleanup. |
 | `@M_KOJO_MESSAGE_COM_K{id}_406` | "Read diary" command body. |
 
@@ -146,9 +151,57 @@ SIF CFLAG:{id}:現在位置 != CFLAG:MASTER:現在位置
 
 **`@M_KOJO_EVENT_K{id}_3(ARG, ARG:1)` — bedtime.** Same map-vs-cell distinction as `_2`. Same guard required.
 
-For other EVENT slots (4..30+), check the corresponding body in 001 Reimu's kojo for ARG semantics; the pattern of "guard first, branch ARG, RETURN 0 per branch" applies universally.
-
 **Why this isn't obvious from the engine source**: the dispatcher in `KOJO_MESSAGE.ERB` doesn't filter by current-cell; it filters only by *map presence*. The cell check is the kojo's responsibility. Most reference kojo include this guard but they don't emphasize it — it has to be observed by reading them.
+
+### 2.4.2 Full EVENT-slot ARG map (slots 1-34)
+
+Per the official template (`reference-kojo/口上テンプレ/M_KOJO_KX_イベント.ERB`) cross-checked with the authoritative `口上作者様へ.txt` (slots 1-23). Slots 24-34 are documented in the template only.
+
+| Slot | Name | ARG | ARG:1 | Notes |
+|---:|---|---|---|---|
+| 1 | 部屋で遭遇 (room/cell encounter) | 1=MASTER入室時 char居 / 2=char入室時 MASTER居 / 3=char入浴, 一緒に入る / 4=char入浴, 出ていく / 5=char入浴, 追い出される / 6=外出先で遭遇 / 7=他キャラとデート中 / 8=MAIN_MAP初挨拶 / 9=外出先初挨拶 | 7のみ デート相手 / 9のみ デート相手(0=独り) | **Mandatory cell-guard** (§2.4.1) |
+| 2 | おはよう (morning) | 1=通常起床 | — | **Mandatory cell-guard** |
+| 3 | おやすみ (bedtime) | 1=自室帰宅 / 2=眠そう / 3=睡眠中 / 4=イタズラ中 / 5=衰弱中 / 6=MASTER気絶 | — | **Mandatory cell-guard** |
+| 4 | 移動すれ違い (passing) | 1=立ち止まる / 2=軽く会釈 / 3=無視 | — | |
+| 5 | 他者介入ムード変化 | char id | 介入者id | |
+| 6 | 情事目撃 | char id | 情事の相手 id | ARG:2: 1=低 / 2=高(参加) / 3=立ち去り |
+| 7 | 情事見られた | char id | 目撃した相手 id | ARG:2: 同上 |
+| 8 | 情事問い詰め | char id | 問い詰め者 id | ARG:2: 1=MASTER説教 / 2=二人説教 |
+| 9 | 弱み握られ | char id | 1=同居場で / 2=遠距離移動中 | 初回のみ |
+| 10 | 押し倒され | char id | 1=押し倒した / 2=なだめた | カウンター起動 |
+| 11 | 浴場遭遇 | char id | 1=追い出された / 2=目が合った | MASTER入浴時のみ |
+| 12 | 忍び込み時 | char id | 1=侵入時 / 2=怒り中 | ARG:2: 1=通常 / 2=恋慕 / 3=恋慕衰弱 / 4=追出 / 5=追出衰弱 |
+| 13 | 仕事中 | char id | 1=開始 / 2=業務中 / 3=終了 | ARG:2: 業務中なら残量(3>2>1), 終了時はMASTER労働量 |
+| 14 | 食事系 | char id | -1=食べられた | 食べ物所持時遭遇 |
+| 15 | 押し倒し | char id | 1= / 2=終了 | MASTER側 |
+| 16 | 添い寝 | char id | 2=終了 | 抜ける時 |
+| 17 | 時止め終了 | char id | 1=謎の快感 / 2=絶頂 / 3=パンツ強奪 / 4=【無自覚口内射精】 / 5=【無自覚顔面射精】 / 6=【無自覚手淫射精】 / 7=【無自覚アナル射精】 / 8=【無自覚処女喪失】 / 9=【無自覚膣内射精】 | ARG:2 varies | テンプレ参照 |
+| 18 | ナマでやらせろ | char id | 1=避妊要求 / 2=断った / 3=粘られて切れた / 4=危険日以外許可 / 5=危険日許可 | |
+| 19 | 神社暮らし承認 | char id | 1=住み込み決定後 / 2=お断り時 | |
+| 20 | 非住み込み帰宅 | char id | 1=通常帰宅 / 2=デート中帰宅 | 帰宅の地の文の手前 |
+| 21 | 陥落素質取得 | char id | 1=恋慕 / 2=思慕 / 3=愛欲 / 4=愛人 / 5=セフレ | 就寝後 |
+| 22 | 就寝時自慰 | char id | 1=自慰 | 就寝後 |
+| 23 | 浴場連れ出し | char id | 1=入浴拒否 / 2=入浴許可 | 連れ出し中 → バスルーム移動時 |
+| 24 | 懐妊 (pregnancy) | 1=恋慕 / 2=思慕 / 3=陥落素質無し / 4=無自覚 | — | |
+| 25 | 出産 (childbirth) | 同上 | 何人目の子供 | |
+| 26 | オナバレ (caught) | 0=見られた瞬間 / 1=何もしない / 2=そのまま続行 / 3=追い出し / 4=やっちゃう / 5=事後 / 6=事後お泊り | — | Pair with `EVENT_K{id}_26_1(ARGS)` for action-choice pre-judgment (§2.4 above). |
+| 27 | 相手からデート誘い | 0=誘い文句 / 1=受けた / 2=断った / 3=部屋に誘われた / 4=受けた / 5=断った | 目的地 | |
+| 28 | 脱衣 | 0=全裸 / 1=下着 / 2=半脱ぎ / 3=パンツちょうだい | ARG=3のみ: 0=交換 / 1=OK嬉々 / 2=OK渋々 / 3=嫌 | |
+| 29 | 怒り | 1=怒らせた / 2=泣かせた(臆病) | TARGETの度胸 | |
+| 30 | 押し倒し解除 (相手側) | 1=疲れた / 2=満足解放 / 3=満足→押し倒された / 4=壊れるまで | — | TARGET主導 |
+| 31 | 一日終了時 | 会ってない日数 | — | 面識なしでは呼ばれない。`CALL EVENTEND_TSUBUYAKI` で口上前に発生文を呼ぶ。 |
+| 32 | 自由行動中 | 0=考え事 / 1=遊ぶ / 2=食事 / 3=つまみ食い / 4=掃除 / 5=運動 / 6=読書 / 7=料理 / 8=演奏 / 9=採集 / 10=釣り / 11=実験 / 12=のんびり / 13=晩酌 / 14=買い物 / 15=説教 / 16=落とし穴 / 17=雪だるま / 18=炬燵 | 0=行動中 / 1=完了時 | 技能系は技能Lv≥1のみ |
+| 33 | ハッピーニューイヤー | — | — | 年越し瞬間に同室 |
+| 34 | 技能レベルアップ | 1=戦闘 / 2=話術 / 3=清掃 / 4=教養 / 5=料理 / 6=採集 / 7=音楽 / 8=釣り / 9=調合 / 10=伐採 / 11=指 / 12=舌 / 13=胸 / 14=腰 / 15=膣 / 16=アナル | 一部は素質取得時1+(0=技能, 1=素質) | レベルアップ後の値 |
+
+### 2.4.3 Special "RESULTS-not-PRINT" labels
+
+These labels DO NOT use `PRINT*` — the engine reads a string from `RESULTS` after the body returns and renders it itself (with auto-formatting and line wrapping). Putting `PRINTFORML` inside breaks the display.
+
+| Label | Args | Body contract |
+|---|---|---|
+| `@M_KOJO[%RESULTS%_]MESSAGE_COM_K{id}_MUSHI_BATTLE(ARGS, ARG)` | (string scene, int) | Bug-battle dialogue. `ARGS` selects scene: `"試合前"` / `"戦場に出した"` / `"攻撃時"` / `"倒れた時"` / `"敗退時"` / `"タイマン：勝ち"` / `"タイマン：負け"` / `"バトルロイヤル：優勝"` / `"バトルロイヤル：２位以下"` / `"チーム戦：勝ち"` / `"チーム戦：負け"`. `ARG` = remaining-bugs or rank. **Write `RESULTS = "<line>"` then `RETURN 1`.** Line length capped: `試合前` 50 chars, others 40 chars. `%MUSHI_NAME%` works inside the string. |
+| `@M_KOJO[%RESULTS%_]MESSAGE_COM_K{id}_SUIKA(ARGS, ARG)` | (string cue, int) | Watermelon-split (suikawari) directional callouts. `ARGS`: `"衝突"` / `"そこだ！"` / `"近い"` / `"遠い"` / `"かなり遠い"` / `"前"` / `"少し前"` / `"後ろ"` / `"少し後ろ"` / `"右"` / `"少し右"` / `"左"` / `"少し左"` / `"結果"`. **Write `RESULTS = "<line>"`.** `RESULTS = %TEXTR("A/B/C/")%` works inside (random selection). Most cues have a 26-char limit; `衝突` and `結果` have no limit (and get auto-color). The `結果` case branches on `TFLAG:193` (-1 fail / 0 success / 1 big / 2 wooden-sword bonus) and `ARG` (0=正直 / 1=ウソつき). |
 
 ### 2.5 The MESSAGECHECK family — a powerful and easily-overlooked dispatch hook
 

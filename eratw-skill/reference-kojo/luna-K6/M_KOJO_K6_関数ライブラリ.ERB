@@ -1,0 +1,25 @@
+﻿;※※※※※※※※※※※※※※※※※※※※※※※※※
+;函数库 —— 露娜专用小工具
+;※※※※※※※※※※※※※※※※※※※※※※※※※
+
+;返回此刻与露娜同格的姐妹（5=桑尼米尔克 / 7=斯塔萨菲雅），都不在则 0
+@K6_FIND_SISTER()
+#FUNCTION
+IF CFLAG:5:現在位置 && CFLAG:5:現在位置 == CFLAG:6:現在位置
+	RETURNF 5
+ELSEIF CFLAG:7:現在位置 && CFLAG:7:現在位置 == CFLAG:6:現在位置
+	RETURNF 7
+ENDIF
+RETURNF 0
+
+;按时段返回一句露娜风格的问候（字符串）
+@K6_GREETING()
+#FUNCTIONS
+SELECTCASE TIME:2
+	CASE 0, 1
+		RETURNF "夜里好……难得你也醒着呢。"
+	CASE 2, 3
+		RETURNF "唔……大白天的，好刺眼。"
+	CASEELSE
+		RETURNF "晚上，才是妖精的主场哦。"
+ENDSELECT

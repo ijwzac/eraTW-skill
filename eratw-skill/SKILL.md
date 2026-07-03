@@ -77,6 +77,9 @@ This skill ships with a `references/` directory of supplementary docs (full labe
 | Character ID ⇆ name table (Romaji/Japanese/Chinese) | `references/08-character-id-table.md` |
 | Persona-translation tips | `references/09-persona-tips.md` |
 | File encoding (UTF-8 BOM, CRLF, BOM-prepend recipe) | `references/10-encoding-and-tools.md` |
+| Official empty template (canonical multi-file skeleton + the doc-banner comments that ARE the spec) — **read first** before scaffolding from scratch | `reference-kojo/口上テンプレ/M_KOJO_KX_*.ERB`, especially `M_KOJO_KX_イベント.ERB` |
+| Filled-in worked-example kojo (when you need to see a real-world body, not just an empty stub) | `reference-kojo/reimu/M_KOJO_K1_*.ERB` (and `霊夢さんのreadme.txt`); grep specific commands as needed |
+| First-party helper functions (`ASK_YN`, `ASK_M`, `TEXTR`, `HPH_PRINT`, `FIRSTTIME`, `AddEXP`) — what they do and when to use them | `references/03-engine-helpers.md` §5.2–§5.6.1 |
 
 **For chatbot mode**, when you need any of the above, tell the user verbatim: *"Please upload `references/<filename>` from the eraTW-skill repository, or paste its contents."* Always name the **specific file** — don't say "upload the data" generically.
 
@@ -84,13 +87,30 @@ This skill ships with a `references/` directory of supplementary docs (full labe
 
 The user may share their current kojo or other characters' kojo for reference. **Read for structure, not content.** Bodies that contain explicit prose: skim only enough to see surrounding control flow and file role. Quote at most 1-2 lines of dialogue when essential.
 
+**Reference priority order** when figuring out "how should this be structured":
+
+1. **The user's own kojo (their fork, previous attempt, or a sibling-character peer they uploaded)** — primary. Their fork's conventions, their author-private CFLAG ranges, the persona register they want to match. Skip reading anything in `reference-kojo/` by default if the user has provided their own structurally-similar files.
+2. **`reference-kojo/口上テンプレ/`** (the official empty template) — secondary. This is the canonical structural skeleton + the doc-banner comments that ARE the spec for each label's `ARG` / `ARG:1` / return-contract. Skim `M_KOJO_KX_イベント.ERB` once at the start of a scaffolding session.
+3. **`reference-kojo/reimu/`** (filled-in worked example) — tertiary. Only when you need to see *how* an empty stub gets filled in (e.g. what does the 恋慕 branch of `MESSAGE_COM_K1_311` look like with real prose? what's a real `EVENT_K1_GRAVITY` body?). Grep the specific section rather than reading whole files.
+
+Mention which reference you're consulting when you do, so the user knows where the pattern came from.
+
+### 0.6 `[SKIPSTART]/[SKIPEND]` — two legitimate uses you'll see in existing kojo
+
+The Emuera parser skips everything between `[SKIPSTART]` and `[SKIPEND]` lines (each on its own line, square brackets included). Existing kojo (Reimu K1, Lunasa K22, Eiki K30, etc.) use this for two distinct purposes — both are valid:
+
+1. **Dev-time multi-line comment / temporary disable.** Wrap a block you're not ready to ship — half-finished prose, an experimental cascade, an idea you might come back to. The block stays in the file (versionable, easy to re-enable by deleting two lines) but the engine doesn't compile it. This is the most common usage.
+2. **Optional new-API features.** Wrap any `@KOJO_CUSTOM_BUTTON_*` / `@KOJO_CUSTOM_TALENT_*` block when you're not sure the user's engine version supports it; the file then loads cleanly on older engines too.
+
+**When you write new code**: prefer `;`-prefixed line comments for short notes; reach for `[SKIPSTART]/[SKIPEND]` only when you genuinely want a multi-line block that's parseable but disabled. **When you read existing code**: don't assume a SKIPSTART block is "dead code to delete" — the author may be intentionally parking work-in-progress there.
+
 ---
 
 ## 1. Most-common first-pass mistakes — read every time
 
 These are the bugs we see in nearly every first-pass kojo generation. Hold them in your head while writing. Each one is detailed in the relevant section/reference below.
 
-1. **`@FOO(ARG, TYPE = 0)` will not compile.** Emuera only accepts positional `ARG / ARG:N / ARGS / ARGS:N` parameter names. Custom names like `TYPE`, `相手残機`, `OPTION` raise a Lv2 warning and the variable becomes unreadable inside the body. Use `@FOO(ARG, ARG:1 = 0)` and (optionally) `TYPE = ARG:1` as an alias on the first line of the body. → §7 / `references/04-dsl-full.md`
+1. **Custom-named function parameters need a `#DIM` declaration in the body.** Emuera's parser only auto-recognizes positional `ARG / ARG:N / ARGS / ARGS:N`. Any other identifier in the header — `TYPE`, `相手残機`, `OPTION`, `PAGENUM`, `MODE`, `PAGECOUNT` — raises a Lv2 warning and reads return zero unless the body declares the variable with `#DIM <name>` (numeric) or `#DIMS <name>` (string) immediately after the `@` line. **Two acceptable shapes:** ① rename to positional: `@FOO(ARG, ARG:1 = 0)` then optionally `TYPE = ARG:1` as an alias; ② keep the engine-required custom names (e.g. `@DIARY_TEXT_K{id}, PAGENUM, MODE, PAGECOUNT`) and declare them with `#DIM PAGENUM / #DIMS MODE / #DIM PAGECOUNT` on the first three body lines. The engine-callable labels that *require* shape ② are flagged in `references/01-engine-label-catalog.md` §2.4 — chiefly `@DIARY_TEXT_K{id}`. → §7 / `references/04-dsl-full.md`
 2. **`[[X]]` silently compiles to `0` when X is not in `Str.csv`.** Most character names — `[[アリス]]`, `[[ルナサ]]`, `[[メルラン]]`, `[[幽々子]]`, `[[ライコ]]`, etc. — are NOT in `Str.csv`, so `CASE [[ルナサ]]` becomes `CASE 0` and matches ARG=0 by accident. **Default to numeric IDs with comments**: `CASE 22  ;ルナサ`. Reserve `[[X]]` for names you've grep-confirmed in `Str.csv`.
 3. **`MASTER`, `TARGET`, `PLAYER`, `ASSI` are bare identifiers, not `[[MASTER]]`.** Writing `[[MASTER]]` produces a warning.
 4. **`@M_KOJO_EVENT_K{id}_1(ARG, ARG:1)` fires once PER CELL TRANSITION** the character makes anywhere on MASTER's current world map, not "once when entering MASTER's room." A char walking bedroom→corridor→dining will print 3 dialogue lines while MASTER is still asleep. **Mandatory first guard:** `SIF CFLAG:{id}:現在位置 != CFLAG:MASTER:現在位置 / RETURN 0`. Then branch on ARG sub-phase (1=MASTER walks in, 2=char walks in, 3-5=bath sub-phases). Same applies to `_2` (morning) and `_3` (sleep). → `references/05-event-arg-subphases.md`
@@ -141,6 +161,35 @@ echo "=== EVENT_K_X bodies missing the same-cell guard ==="
 grep -l "@M_KOJO_EVENT_K[0-9]\+_[123](" *.ERB | while read f; do
     grep -qE "現在位置.*!=.*MASTER:現在位置" "$f" || echo "$f: missing 現在位置 != MASTER:現在位置 guard"
 done
+
+echo "=== IF / ENDIF balance per file ==="
+for f in *.ERB; do
+    ifs=$(grep -cE "^[[:space:]]*(IF|ELSEIF)\b" "$f")
+    ends=$(grep -cE "^[[:space:]]*ENDIF\b" "$f")
+    sif=$(grep -cE "^[[:space:]]*SIF\b" "$f")
+    expected=$((ifs - sif))   ; SIF has no matching ENDIF
+    [ "$ends" -eq "$expected" ] || echo "$f: IF/ELSEIF (excl SIF)=$expected, ENDIF=$ends"
+done
+
+echo "=== SELECTCASE / ENDSELECT balance per file ==="
+for f in *.ERB; do
+    s=$(grep -cE "^[[:space:]]*SELECTCASE\b" "$f")
+    e=$(grep -cE "^[[:space:]]*ENDSELECT\b" "$f")
+    [ "$s" -eq "$e" ] || echo "$f: SELECTCASE=$s, ENDSELECT=$e"
+done
+
+echo "=== [SKIPSTART] / [SKIPEND] balance per file ==="
+for f in *.ERB; do
+    s=$(grep -cF "[SKIPSTART]" "$f")
+    e=$(grep -cF "[SKIPEND]"   "$f")
+    [ "$s" -eq "$e" ] || echo "$f: [SKIPSTART]=$s, [SKIPEND]=$e"
+done
+
+echo "=== Duplicate @label across all files (will hide later definition) ==="
+grep -hE "^@[A-Za-z_][A-Za-z0-9_]*" *.ERB | awk '{print $1}' | sort | uniq -d
+
+echo "=== RAND:0 (would crash at runtime) ==="
+grep -nE "RAND:0\b" *.ERB
 ```
 
 If any check fails, fix and re-run. **Re-run after every Edit pass** because tools sometimes strip BOM on rewrite.
@@ -158,13 +207,13 @@ The game has two relevant menu actions under **「文件」** (File menu):
 - **「保存日志」** — saves the current session log to a file in the game directory.
 - **「将日志复制到剪切板」** — copies the session log to clipboard, ready for the user to paste into chat.
 
-**The user pastes the relevant log section into the conversation; you read it.** Don't ask the user to summarize — let them paste raw. Logs are small and structured.
+**The user pastes the relevant log section into the conversation; you read it.** Ask users to paste only the relevant section, since the entire log can be long and contain lots of irrelevant content.
 
-In addition, the game writes `emuera.log` (live, appended) and `<YYYYMMDD-HHMMSS>.log` (per-session) files in the game root directory. The user can also share those.
+In addition, the game writes `emuera.log` and `<YYYYMMDD-HHMMSS>.log` (per-session) files in the game root directory. But the former may not be lively updated. The latter is generated by **「保存日志」**.
 
-### 3.2 Compilation errors — must be fixed before anything else plays
+### 3.2 Compilation errors — must be fixed before anything else
 
-Compilation errors prevent the game from loading. They appear at game launch.
+Compilation errors don't prevent the game from loading, but they may crash the game anytime. They appear at game launch.
 
 **A healthy launch shows roughly four lines:**
 
@@ -175,7 +224,7 @@ Loading complete. Took 2.19 seconds.
 Press Enter or click to proceed.
 ```
 
-**Any `警告Lv2:` lines between the second and third are compilation errors.** Example:
+**Lines between the second and third are likely compilation errors.** Example:
 
 ```
 如果出現了錯誤、請根據目錄下的報錯指導文件進行報錯
@@ -303,12 +352,17 @@ eraTW/
 │   ├── Base.csv, Palam.csv               ; physiological base / parameters
 │   ├── Str.csv                           ; string table — gates [[X]] resolution
 │   └── Chara/                            ; per-character data CSVs (1 per char)
+├── 原版+前人整合等各种readme/             ; community tutorials & templates (see §12)
+│   ├── 改造とかしてみたい人のためのあれこれ/  ; modding tutorials (kojo tutorials, helper-fn ref, …)
+│   └── 資料/                               ; reference tables (CFLAG/TFLAG/TCVAR IDs, maps, …)
 ├── Emuera*.exe                           ; engine binaries (multiple variants)
 ├── emuera.config, README*                ; engine config
 └── sav/, dat/, resources/, font/         ; saves, sprites, fonts
 ```
 
 **Key insight**: there's no plugin manifest. The engine recursively scans `ERB/` at load time; *adding a new file is the entire installation*. Drop a variant directory into `個人口上/<id> <name>/` and you're done.
+
+`原版+前人整合等各种readme/` is the original Japanese community's tutorial corpus — **most of the structural knowledge in this skill is sourced from there.** It's not loaded by the engine; it lives in the install for human reference. See §12 for what's in it and when to consult it directly.
 
 ---
 
@@ -387,22 +441,31 @@ The engine's `ARGS` keys (full label catalog → `references/01-engine-label-cat
 | `"MARK"` | Mark / imprint acquired. | `@M_KOJO_MESSAGE_MARKCNG_K{id}` |
 | `"DANMAKU"` | Bullet-hell duel. | `@M_KOJO_MESSAGE_COM_K{id}_DANMAKU(ARGS, ARG)` |
 | `"IRAI"` | Quest dialogue. | `@M_KOJO_IRAI_K{id}(ROLE, SCENE, IRAI_ID)` |
-| `"DAILY"` | Daily event. | `@M_KOJO_DAILY_EVENT_K{id}_{n}(ARG..., ARGS:1, ARGS:2)` |
+| `"DAILY"` | Daily event. | `@M_KOJO_DAILY_EVENT_K{id}_{n}(ARG..., ARGS:1, ARGS:2)` — known n: 2 (夢精), 4 (物思い), 12 (特訓) |
 | `"DIARY"` | Diary read. | `@DIARY_K{id}_*`, `@M_KOJO_MESSAGE_COM_K{id}_406` |
 | `"CHILD"` | Child-rearing event. | `@M_KOJO_EVENT_K{id}_CHILD_RAISING_*` |
 | `"GRAVITY"` | NPC AI movement decision (silent!). | `@M_KOJO_EVENT_K{id}_GRAVITY(ARG)` ← **silent**, sets `TCVAR:N:引力点`, never prints |
 | `"BEFORETRAIN"` | Pre-training silent hook. | `@K{id}_BEFORETRAIN` ← **silent** |
 | `"PERMISSION"` | Push-down consent (silent helper). | `@M_KOJO_EVENT_K{id}_PERMISSION_<n>(ARG)` |
 | `"LOST_VIRGIN_STOP"` | Virginity-loss interrupt (silent). | `@M_KOJO_EVENT_K{id}_LOST_VIRGIN_STOP(ARG)` |
-| `"GIFT"`, `"ODEKAKE"`, `"SEX_FRIEND"`, `"ONABARE"`, `"MUSHI_BATTLE"`, `"SUIKA"`, `"DIRECT"`, `"SUCCESS"`, `"ENDING"` | Misc / special. | (see references/01) |
+| `"GIFT"` | Gift received/given. | `@M_KOJO_EVENT_K{id}_GIFT(ARG, GIFT_ID, 評価点, GIFT_NAME, SENSE)` (5-arg, custom names — body needs `#DIM`/`#DIMS`) |
+| `"ONABARE"` | Caught-masturbating outburst. | `@M_KOJO_EVENT_K{id}_26(ARG, ARG:1)` (main dialogue) + `_26_1(ARGS)` (action pre-judgment) + optional `_ONABARE_1/2/3` (narration override) |
+| `"MUSHI_BATTLE"` | Bug-battle dialogue. | `@M_KOJO_MESSAGE_COM_K{id}_MUSHI_BATTLE(ARGS, ARG)` ← **writes `RESULTS = "..."`, NOT `PRINT*`** |
+| `"SUIKA"` | Watermelon-split directional callouts. | `@M_KOJO_MESSAGE_COM_K{id}_SUIKA(ARGS, ARG)` ← **writes `RESULTS = "..."`, NOT `PRINT*`** |
+| `"RUN_INTO"` | Random encounter on map. | `@RUN_INTO_K{id}(MAP_ID)` |
+| `"SEX_FRIEND"` | "Sex friend" contract scene. | `@KOJO_SF_CONTRACT_EVENT_K{id}(ARGS)` ("導入" / "補正" / "成功" / "失敗") |
+| `"IRAI_BLOCKED"` | Suppress specific quest from this char. | `@M_KOJO_CHECK_K{id}_IRAI_BLOCKED(ARGS, ARG, ARG:1)` ← returns 1 to block |
+| `"ODEKAKE"`, `"DIRECT"`, `"SUCCESS"`, `"ENDING"` | Misc / niche. | (see references/01) |
 
-**Distinguishing print vs silent dispatch is critical** — putting `PRINTFORML` in a silent label (GRAVITY especially) spams the player every NPC-movement tick. → §1 pitfall #5
+**Distinguishing print vs silent vs RESULTS-only dispatch is critical**:
+- **silent labels** (GRAVITY, BEFORETRAIN, PERMISSION, LOST_VIRGIN_STOP): putting `PRINTFORML` inside spams the player every tick → §1 pitfall #5
+- **RESULTS-only labels** (MUSHI_BATTLE, SUIKA): use `RESULTS = "<line>"` then `RETURN 1` — the engine prints it itself with auto-formatting. `PRINTFORML` here breaks the display. See `references/01-engine-label-catalog.md` §2.4.3.
 
 ---
 
 ## 7. Standard body shape (the most-reused template)
 
-Every command body follows this pattern. Use it as your default scaffold:
+Every command body follows this pattern. Use it as your default scaffold. The 10-tier cascade shown below is the *maximal* form; the official empty template (`reference-kojo/口上テンプレ/`) uses a simpler 4-tier cascade — see §9 for when each fits.
 
 ```erb
 ;==================================================
@@ -499,7 +562,9 @@ This lets an author selectively enable/disable parts.
 
 ## 9. The standard branching cascade
 
-The canonical conditional cascade in a daily/sex/sexual-harassment body:
+Two cascades are common; pick the one that fits the character's complexity.
+
+### 9.1 Maximal (10-tier) cascade — for full-featured kojo with rich per-tier flavor
 
 | Order | Guard | Comment |
 |---|---|---|
@@ -516,9 +581,42 @@ The canonical conditional cascade in a daily/sex/sexual-harassment body:
 
 Some authors collapse this into a helper `陥落状態()` returning 0..5; bodies then use `IF 陥落状態() >= 4 ...` instead of testing TALENT directly.
 
-For sex commands, add intermediate guards on `BASE:MASTER:勃起`, `TCVAR:破瓜`, `TFLAG:193`, `TFLAG:194`, etc. — refer to the doc-banner state contract above each command.
+### 9.2 Official-template (4-tier) cascade — for simpler or partially-populated kojo
 
-**Watch out**: every early-return condition above the TALENT cascade *suppresses all relationship content below it*. For broad conditions (room class, weather, time-of-day), prefer RAND-gating or moving the condition inside relationship branches as flavor sub-conditions, instead of as an early-return blocker.
+This is the cascade the official empty template (`reference-kojo/口上テンプレ/`) uses by default:
+
+```erb
+IF LOCAL:1 && FIRSTTIME(SELECTCOM)   ; first-time line (optional opener)
+    PRINTFORMW <first-time-line>
+    RETURN 1
+ENDIF
+;基本セット
+IF FLAG:70                            ; 時姦中 (time-stop)
+    PRINTFORMW <time-stop-line>
+    RETURN 1
+ELSEIF TALENT:恋慕                    ; in love
+    PRINTFORMW <love-line>
+    RETURN 1
+ELSEIF MARK:不埒刻印 == 3             ; lv3 submission imprint
+    PRINTFORMW <submission-line>
+    RETURN 1
+ELSE                                  ; everything else
+    PRINTFORMW <default-line>
+    RETURN 1
+ENDIF
+```
+
+**Use the 4-tier** when the user's persona/character is simple, when they don't care about per-tier nuance, or when they want to populate just the most-common cases and let everything else fall through. **Use the 10-tier** when the user explicitly wants rich tier-distinct flavor (e.g. distinct lines for 思慕 vs 恋慕 vs 愛欲 vs 恋人), or when the persona requires gating on 扮演/CFLAG:318 etc.
+
+Both are valid and match published kojo in the install. Don't force the 10-tier onto a body where 4 lines is enough.
+
+### 9.3 Sex-command intermediate guards
+
+For sex commands (60-77, 95, plus 逆アナル 90-95), add intermediate guards on `BASE:MASTER:勃起`, `TCVAR:破瓜`, `TFLAG:193` (success grade), `TFLAG:194` (SELECTCOM record), etc. — refer to the doc-banner state contract above each command in the template, and to `references/02-state-bus-namespaces.md`.
+
+### 9.4 Early-return warning
+
+Every early-return condition above the TALENT cascade *suppresses all relationship content below it*. For broad conditions (room class, weather, time-of-day), prefer RAND-gating or moving the condition inside relationship branches as flavor sub-conditions, instead of as an early-return blocker.
 
 ---
 
@@ -528,12 +626,33 @@ Three common workflows. **Full worked examples** with file scaffolds, exact labe
 
 ### 10.1 New variant from scratch (target: empty char dir)
 
-1. Confirm character ID and dir name (use `references/08-character-id-table.md` or grep `Chara/`).
-2. Scaffold ~13 files: `イベント / 日常系 / 性交系 / セクハラ / 愛撫系 / 加虐系 / 道具系 / 派生 / カウンター / 弾幕勝負 / 刻印取得` plus optional `関数ライブラリ / 育児イベント / 日記 / INFO / 絶頂 / 奉仕系 / ハードな / 自慰系(あなた)`.
-3. In `イベント.ERB` write the existence label `@M_KOJO_K<id>(ARG) RETURN 1` plus FLAGSETTING / COLOR / UPDATE / ENCOUNTER skeletons.
-4. Fill ~5-10 most useful daily commands (300=会話, 301=泡茶, 302=身体接觸, 309=摸頭, 311=擁抱, 312=接吻, …) using the template in §7.
-5. Leave `LOCAL = 0` stubs for everything else — engine falls back to default narration.
-6. Run §2 verification pass.
+1. **Before scaffolding, read the official template.** `reference-kojo/口上テンプレ/` is the canonical empty skeleton shipped with the skill. At minimum skim:
+   - `M_KOJO_KX_イベント.ERB` — existence label, FLAGSETTING, COLOR, UPDATE, ENCOUNTER, BEFORETRAIN, SPEVENT 1-3, EVENT 1-34 (with full ARG doc-banners), DAILY_EVENT 2/4/12, ONABARE_1/2/3, LOST_VIRGIN_STOP, PERMISSION_1/2, GIFT, MUSHI_BATTLE, GRAVITY, SUIKA, RUN_INTO, SF_CONTRACT_EVENT, CHECK_IRAI_BLOCKED.
+   - The TOC banners of `M_KOJO_KX_日常系コマンド.ERB` and `M_KOJO_KX_性交系コマンド.ERB` (grep `^;[0-9]+,` for command-id banners — don't read every body).
+   - `of_new_kojo_api.ERB` if the user wants the new custom-API features.
+
+   The doc-banner comments in the template ARE the spec — they tell you which `CFLAG` gates each label, what `ARG`/`ARG:1` mean per slot, and the return-value contracts (`PERMISSION_1` body returns -1/0/1, `LOST_VIRGIN_STOP` body returns 1=abort/0=proceed, `EVENT_KX_26_1` body returns -1/0/1, etc.). **This is the single most-load-bearing prep step.**
+
+   Only consult `reference-kojo/reimu/` when you need to see a *filled-in* example of a specific body — grep `reimu/M_KOJO_K1_コマンド.ERB` for the command-id you're working on. Don't read whole Reimu files; they're old and monolithic.
+
+   If the user's target character has a same-style sibling/peer with an existing kojo (e.g. one of three sisters, two characters of the same persona type), grep that one too; it'll often have the right `CFLAG:TARGET:*` situational branches and tone.
+
+2. Confirm character ID and dir name (use `references/08-character-id-table.md` or grep `Chara/`).
+
+3. **Scaffold the modern multi-file split** as the official template does:
+   - **Always**: `イベント / 日常系コマンド / セクハラコマンド / 愛撫系コマンド / 加虐系コマンド / 道具系コマンド / 性交系コマンド / 派生コマンド / カウンター / 弾幕勝負 / 刻印取得 / 絶頂`.
+   - **Common**: `奉仕系コマンド / 道具系 / ハードなコマンド / 依頼 / 育児イベント / 日記 (or 日記（簡易版）)`.
+   - **Optional**: `自慰系(あなた)コマンド / 固有カウンター / of_new_kojo_api / 関数ライブラリ / INFO / <chara>特殊イベント`.
+
+   File names are `M_KOJO_K<id>_<category>.ERB`. Match the template's filenames byte-for-byte (including 全角 parentheses in `自慰系(あなた)コマンド.ERB`). Reimu's monolithic single-`コマンド.ERB` layout is legacy — don't mirror it.
+
+4. In `イベント.ERB` write the existence label `@M_KOJO_K<id>(ARG) RETURN 1` plus FLAGSETTING (with CFLAG enable-flags for the silent helpers you want — `破瓜キャンセル口上有`, `口上内抱き寄せ判定_初回`, `口上内抱き寄せ判定_通常`, `時間停止口上有`, `眠姦口上有`, `なりきり口上有`), COLOR, UPDATE, ENCOUNTER skeletons.
+
+5. Fill ~5-10 most useful daily commands (300=会話, 301=泡茶, 302=身体接觸, 309=摸頭, 311=擁抱, 312=接吻, …) using the §7 template (with either §9.1 maximal or §9.2 4-tier cascade depending on persona complexity).
+
+6. Leave `LOCAL = 0` stubs for everything else — engine falls back to default narration.
+
+7. Run §2 verification pass.
 
 ### 10.2 Adding a one-shot scripted event (anniversary, holiday, etc.)
 
@@ -575,3 +694,93 @@ When the user asks "make X react to Y," the formula is:
 Then deliver the patch. Use unified-diff style if modifying, full-file style if creating. Speak Chinese to the user; keep engine identifiers in their original Japanese/English.
 
 Good luck. The user is making a creative thing they care about; your job is the boring infrastructure work so they can focus on their character.
+
+---
+
+## 12. The community tutorial corpus (`原版+前人整合等各种readme/`)
+
+Your eraTW install almost certainly ships a directory `原版+前人整合等各种readme/` (literally "originals + various-prior-author-integration readmes"). **This is the original Japanese community's tutorial + reference corpus, and most of the structural knowledge in this skill is sourced from there.** It's not loaded by the engine — it lives in the install for human reference.
+
+You normally don't need to read it: the skill has already extracted the relevant parts into `reference-kojo/` and `references/`. But you should **know it exists**, because (a) the user may reference it (asking "what's in `便利な関数.txt`?"), (b) the user may have a **newer version** of the corpus than what this skill was built from, and (c) for niche topics not covered here, it's the authoritative source.
+
+### 12.1 Structure of `原版+前人整合等各种readme/`
+
+```
+原版+前人整合等各种readme/
+├── eraTW_FAQ.txt                       ; player-facing FAQ (not for modders)
+├── 更新内容・readme.txt                  ; ~400 KB changelog
+├── 今後の課題・方針・思いつきetc.txt     ; maintainer's roadmap / notes
+├── 改造とかしてみたい人のためのあれこれ/   ; THE MODDING TUTORIALS — read this first
+│   ├── 口上関連/                         ; everything kojo-specific
+│   │   ├── worldパッチ制作者による超初心者向け口上の書き方入門.txt
+│   │   │                                 ; ★★★ The maintainer's beginner kojo intro (100 lines)
+│   │   ├── TW口上作成周辺の注訳.txt
+│   │   │                                 ; ★★★ "Tutorial-written-as-kojo" — covers IF/ELSEIF/SIF, &&/||, CFLAG, PRINTDATA
+│   │   ├── 口上作者様へ.txt
+│   │   │                                 ; ★★★★ Authoritative ENCOUNTER/EVENT 1-23/SP_EVENT 1-3 ARG semantics
+│   │   ├── 超初心者向け使用頻度の高い変数の説明.txt
+│   │   │                                 ; ★★★ FLAG vs CFLAG vs TFLAG vs TCVAR vs TALENT vs ABL vs BASE one-liners
+│   │   ├── 口上テンプレ/                  ; ★★★★★ THE OFFICIAL EMPTY TEMPLATE — copied verbatim into reference-kojo/口上テンプレ/
+│   │   ├── 別人版用口上テンプレ/          ; same template but for "alternate-personality" variants
+│   │   ├── 口上ファイル以外のキャラ別メッセージ等.txt
+│   │   ├── 口上作者様へ.txt              ; (same as above — see ★★★★)
+│   │   ├── 日記帳れどめ.txt              ; diary-system documentation
+│   │   ├── eraTheWorld proto4.11 イベントまとめ(仮)/     ; older EVENT reference (superseded)
+│   │   ├── txt口上ノート/                ; plain-text kojo planning worksheets
+│   │   └── TW用私製テンプレ/            ; one author's alternate template style
+│   ├── 便利な関数.txt                    ; ★★★★ First-party helper-function reference (ASK_YN, ASK_M, TEXTR, HPH_PRINT, FIRSTTIME, AddEXP)
+│   ├── キャラ追加のススメVer.2.0.txt     ; ★★ How to add a new character (CSV layer + chara-data + CHARAMOVE)
+│   ├── キャラ設定向け参考資料.txt        ; character-stats setting guidance
+│   ├── 改造関連FAQ.txt                   ; ★★ Don't-use-Notepad, use Sakura Editor, etc.
+│   ├── お手軽！…仕事の追加講座.txt     ; easy job-add for non-programmers
+│   ├── 下着追加のススメ80%版.txt         ; underwear-system mod tutorial
+│   ├── eTW用コマンド作成例/              ; command-creation examples (COMF system)
+│   ├── eratohoTWサクラエディタ用キーワードヘルプ/    ; Sakura Editor syntax highlighting
+│   ├── MOB子素材作成のすすめ20180409/    ; mob-character asset creation
+│   ├── NewIraiSystem.txt                 ; new IRAI (quest) system
+│   ├── CharaXX テンプレ.csv              ; CSV template
+│   ├── IRAI_XX 依頼テンプレ.ERB          ; quest template
+│   ├── ROOMSETTING_XX.ERB                ; room-setting template
+│   ├── IMAGE_IXX_○○ テンプレ.ERB        ; per-char image template
+│   └── DAIRY_EVテンプレ.ERB              ; daily-event template
+├── 資料/                                 ; reference tables (Shift-JIS encoded — read with --encoding shift_jis)
+│   ├── 変数一覧/                         ; authoritative variable-ID tables
+│   │   ├── CFLAGS.txt                    ; CFLAG:N ID table (273 lines)
+│   │   ├── TFLAGS.txt                    ; TFLAG:N ID table (111 lines)
+│   │   ├── TCVAR.txt, EXP.txt, FLAGS.txt, EQUIP.txt, TEQUIP.txt, …
+│   │   └── 現在位置一覧.txt              ; CFLAG:300 (current location) ID enumeration
+│   ├── 刻印取得条件.txt, 陥落系素質取得条件.txt   ; trait acquisition conditions
+│   ├── 技能成長条件.txt                  ; skill growth conditions
+│   ├── MAP.txt, 月マップ全景&ROOMSETTING一覧.txt, 紅魔館マップ全景.txt, 神社周辺見取り図.txt
+│   └── 実装済みお仕事一覧.txt            ; jobs catalog
+├── パッチ/                               ; 60+ version-pinned bugfix patches (historical, mostly irrelevant)
+└── (etc — older readmes, version notes)
+```
+
+### 12.2 What's been integrated into this skill, and what hasn't
+
+| Source file | Where it lives in the skill |
+|---|---|
+| `口上テンプレ/` (whole dir) | Copied verbatim to `reference-kojo/口上テンプレ/` |
+| `口上作者様へ.txt` (EVENT 1-23 ARG semantics) | Integrated into `references/01-engine-label-catalog.md` §2.4.2 (extended to 1-34 from template) |
+| `便利な関数.txt` (ASK_YN/ASK_M/TEXTR/HPH_PRINT/FIRSTTIME/AddEXP) | Integrated into `references/03-engine-helpers.md` §5.2 / §5.6.1 |
+| `worldパッチ制作者による超初心者向け口上の書き方入門.txt` (PRINT-family, CALLNAME, SETCOLOR walkthrough) | The walkthrough's lessons are baked into §5–§8 here |
+| `TW口上作成周辺の注訳.txt` (IF/SIF/&&/PRINTDATA tutorial) | Lessons baked into §1, §7, §8 |
+| `超初心者向け使用頻度の高い変数の説明.txt` (FLAG vs CFLAG vs TFLAG one-liners) | Baked into §5 + `references/02-state-bus-namespaces.md` |
+| `日記帳れどめ.txt` (diary-system 0/1/2/3 state) | Integrated into `references/01-engine-label-catalog.md` §2.4 DIARY row |
+| `資料/変数一覧/*.txt` (CFLAG/TFLAG/TCVAR ID enumeration) | **Not integrated** — the skill assumes you read `references/data/CFLAG.csv` etc. for per-slot lookup. The Japanese textfiles cover the same data but in Shift-JIS. If a user asks "what's CFLAG:341 for?" and your CSV doesn't have it, check `資料/変数一覧/CFLAGS.txt`. |
+| `キャラ追加のススメVer.2.0.txt` (new-character CSV scaffolding) | **Not integrated** — out of scope (this skill is kojo-only). If the user wants to scaffold a *whole new character* (CSV + CHARAMOVE + キャラデータ + kojo), point them at this file. |
+| `パッチ/` (version-pinned bugfix patches) | **Not integrated** — historical. |
+| `eTW用コマンド作成例/` (command-creation examples) | **Not integrated** — out of scope. |
+| `下着追加のススメ80%版.txt` (underwear mod) | **Not integrated** — out of scope. |
+| `NewIraiSystem.txt` (new quest system) | **Not integrated** — relevant only if the user wants to add a new quest type; quest *dialogue* is covered. |
+
+### 12.3 Skill version vs install version
+
+**This skill was built against the corpus as of approximately 2024-05 (the file `mtime` on the source dir).** The user's install may be newer. eraTW updates slowly and almost all updates are backwards-compatible with existing kojo, so the EVENT slot numbers / CFLAG IDs / label naming conventions you see here should still work — but be aware:
+
+- **If the user's install has newer files in `原版+前人整合等各种readme/口上関連/口上テンプレ/`** (e.g. a file named `M_KOJO_KX_<新カテゴリ>.ERB` you don't recognize), trust their copy. Check the file directly — its doc-banner comments will tell you what it's for.
+- **If the user reports an engine warning about a label that this skill doesn't document** (e.g. `@M_KOJO_FOO_K20` raised a warning), suggest they check the corresponding ERB engine file in their install. The engine source is the ultimate authority; this skill is a curated extract.
+- **If the user references a tutorial or template file that's not in the table above**, ask them to share it — it may be new since this skill's last update.
+
+You don't need to scan the corpus directory yourself unless the user specifically asks about something that's not covered here. The point of §12 is just: know it exists, know roughly what's in it, know where it lives in the install.

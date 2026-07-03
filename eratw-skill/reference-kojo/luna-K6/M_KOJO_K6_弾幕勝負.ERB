@@ -2,25 +2,32 @@
 ;弹幕对决
 ;ARGS: 戦闘前 / ハンデ / 被弾 / 乾坤一擲 / 怪力乱神 / 戦闘後
 ;露娜的招牌：月符「Lunatic Rain」（狂雨）、月光「Silent Storm」（寂静风暴）
+;（弹幕由引擎在真实对战中派发，只能手动测试）
 ;※※※※※※※※※※※※※※※※※※※※※※※※※
 @M_KOJO_MESSAGE_COM_K6_DANMAKU(ARGS, ARG)
 #DIMS ARGS
 SELECTCASE ARGS
 	CASE "戦闘前"
+		;@AT 待手动测试 K6_DANMAKU_戦闘前
 		PRINTFORML 「跟、跟我打弹幕？你确定？」
 		PRINTFORML 「哼，别看我这样，月符『Lunatic Rain』的密度，可是连魔理沙都夸过的哦！」
 		PRINTFORMW 「我要让你见识见识——月光妖精，最帅气的烟花！」
 	CASE "ハンデ"
+		;@AT 待手动测试 K6_DANMAKU_ハンデ
 		PRINTFORMW 「让、让你先手好了。反正夜还长，我一点都不急……才不是因为怕输呢！」
 	CASE "被弾"
+		;@AT 待手动测试 K6_DANMAKU_被弾
 		PRINTFORML 「呀——！」
 		PRINTFORMW （露娜被擦了个正着，惊叫出声，却下意识地把这声惨叫也给消了音，只剩嘴型在动。）
 	CASE "乾坤一擲"
+		;@AT 待手动测试 K6_DANMAKU_乾坤一擲
 		PRINTFORML 「够了——！接招吧！」
 		PRINTFORMW 月光「Silent Storm」——一整片寂静无声的风暴骤然铺开，连弹幕擦身而过的呼啸，都被抽得干干净净。
 	CASE "怪力乱神"
+		;@AT 待手动测试 K6_DANMAKU_怪力乱神
 		PRINTFORMW 「桑尼！斯塔！别、别光在旁边看呀，快来搭把手——三妖精，一起上啊！」
 	CASE "戦闘後"
+		;@AT 待手动测试 K6_DANMAKU_戦闘後
 		IF ARG <= 0
 			PRINTFORML 「呼、呼……我、我认输了啦。」
 			PRINTFORMW 「不过……好久没这么尽兴地闹过了呢。人类里，你算是有点意思的。」

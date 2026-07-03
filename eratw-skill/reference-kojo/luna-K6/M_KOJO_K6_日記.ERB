@@ -24,6 +24,7 @@ RETURN 1
 #DIM PAGECOUNT
 SELECTCASE PAGENUM
 	CASE 0
+		;@AT 待自动测试 K6_DIARY_p0
 		PRINTFORML ◇ 露娜的深夜笔记 ◇
 		IF MODE == "指令"
 			PRINTFORML （字迹歪歪扭扭，还沾着几个像是咖啡渍的圆点。）
@@ -31,11 +32,13 @@ SELECTCASE PAGENUM
 			PRINTFORML
 		ENDIF
 	CASE 1
+		;@AT 待自动测试 K6_DIARY_p1
 		PRINTFORML ◇ 关于恶作剧和那两个人 ◇
 		PRINTFORML 今天桑尼的计划又失败了。明明是她自己迷路的，凭什么怪到我头上。
 		PRINTFORML 斯塔在旁边一边煮咖啡一边看笑话。……那杯咖啡真香。（分我一点会怎样嘛。）
 		PRINTFORMW 殿后又是我。每次落单被抓的也是我。真是的，明明是不死的妖精，怎么净受这种委屈。
 	CASE 2
+		;@AT 待自动测试 K6_DIARY_p2
 		PRINTFORML ◇ 关于%CALLNAME:MASTER% ◇
 		IF TALENT:6:恋人
 			PRINTFORML 夜里睡不着的时候，只要想到那个人，胸口就会变得暖暖的。
@@ -45,6 +48,7 @@ SELECTCASE PAGENUM
 			PRINTFORMW 下次……要给他看看，我最帅气的那片弹幕。（才、才不是想被夸呢。）
 		ENDIF
 	CASEELSE
+		;@AT 待自动测试 K6_DIARY_空白
 		PRINTFORML （这一页是空白的，只画着一个随手涂的、歪歪的月亮。）
 ENDSELECT
 RETURN 1
@@ -68,9 +72,11 @@ RETURN RESULT
 LOCAL = 1
 IF LOCAL
 	IF TALENT:6:恋人
+		;@AT 待自动测试 K6_406_恋人
 		PRINTFORML 「诶——！？那、那个不许看啦！里面……写了好多关于你的事呢！」
 		PRINTFORMW （露娜慌忙去抢，脚下照例一绊，连同日记本一起扑进了%CALLNAME:MASTER%怀里。）
 	ELSE
+		;@AT 待自动测试 K6_406_中立
 		PRINTFORML 「喂喂，偷看女孩子的日记，可不是绅士的行为哦。」
 		PRINTFORMW 「……不过，反正你也看不懂我的字。哼，随便你啦。」
 	ENDIF

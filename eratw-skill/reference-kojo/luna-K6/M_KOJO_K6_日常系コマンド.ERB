@@ -56,8 +56,14 @@ IF LOCAL
 				PRINTFORML 「呐、%CALLNAME:MASTER%……夜里睡不着的时候，可以来找我哦。」
 				PRINTFORMW 「反正我本来就醒着嘛。……才、才不是特意等你呢。」
 			CASE 2
-				PRINTFORML 「你看你看，我把这颗会反光的小石头，摆在了窗边。」
-				PRINTFORMW 「等房间铺满这些，就是『地上的月亮』了。到时候……也分你一半好了。」
+				;「地上的月亮」与地点强相关：只有你我同处一室（露娜自室内更贴切）才合情景，故加同格判定＋50%概率，另一半走别的话
+				IF CFLAG:6:現在位置 == CFLAG:MASTER:現在位置 && RAND:2 == 0
+					PRINTFORML 「你看你看，我把这颗会反光的小石头，摆在了窗边。」
+					PRINTFORMW 「等房间铺满这些，就是『地上的月亮』了。到时候……也分你一半好了。」
+				ELSE
+					PRINTFORML 「今天也……难得没被桑尼拉去搞恶作剧呢。」
+					PRINTFORMW 「所以、那个……多陪我待一会儿，也不是不行啦。」
+				ENDIF
 			CASEELSE
 				PRINTFORML 「哈啊……和你在一起的时候，连抱怨都变少了。真奇怪。」
 				PRINTFORMW （露娜靠了过来，把头轻轻搁在%CALLNAME:MASTER%肩上。）
@@ -65,13 +71,13 @@ IF LOCAL
 	ELSEIF TALENT:6:愛欲 || TALENT:6:炮友
 		;@AT 待自动测试 K6_300_愛欲炮友
 		PRINTFORML 「光说话，多没意思呀。」
-		PRINTFORMW （露娜把周围的声音一收，凑到耳边，用只有两人能听见的音量说了句什么。）
+		PRINTFORMW （露娜把周围的声音一收，凑到耳边，用只有两人能听见的音量说道。）
 	ELSEIF TALENT:6:恋慕
 		;@AT 待自动测试 K6_300_恋慕
 		SELECTCASE RAND:3
 			CASE 0
 				PRINTFORML 「那、那个——你不觉得我今天，有哪里不一样吗？」
-				PRINTFORMW （%CALLNAME:MASTER%仔细一看，她头发上系了一条崭新的黑丝带。被夸了一句，她整张脸都红透了。）
+				PRINTFORMW （%CALLNAME:MASTER%仔细一看，她帽子上系了一条崭新的黑丝带。被夸了一句，她整张脸都红透了。）
 			CASE 1
 				PRINTFORML 「斯塔给了我一朵没有刺的蔷薇，还说什么『露娜看不出这蔷薇没刺吗』……」
 				PRINTFORMW 「哈啊，那家伙到底在想什么，我完全搞不懂啦。」
@@ -82,7 +88,7 @@ IF LOCAL
 	ELSEIF TALENT:6:思慕
 		;@AT 待自动测试 K6_300_思慕
 		;单行随机（TEXTR 内容为动态，签名交给集成测试用整句）
-		PRINTFORMW %TEXTR("「无聊的话……要不要，听我抱怨两句？」/「桑尼又搞砸了恶作剧，真是的。」/「人类的白天，太吵、也太亮了。」")%
+		PRINTFORMW %TEXTR("「无聊的话……要不要，听我说两句？」/「桑尼又搞砸了恶作剧，真是的。」/「大晴天，太吵、也太亮了。」")%
 	ELSE
 		;@AT 待自动测试 K6_300_中立
 		SELECTCASE RAND:3
@@ -90,7 +96,7 @@ IF LOCAL
 				PRINTFORML 「哼，人类找妖精搭话，可是很少见的。」
 				PRINTFORMW 「有话快说……我夜里才有精神，白天犯困着呢。」
 			CASE 1
-				PRINTFORML 「我可是光之三妖精里，最接近妖怪的月之妖精。」
+				PRINTFORML 「我可是光之三妖精里，最强的月之妖精。」
 				PRINTFORMW 「所以……别、别小看我啊。（她一边说，一边悄悄往后退了半步。）」
 			CASEELSE
 				PRINTFORML 「你手里那杯，是咖啡吗？……没、没什么，我只是随口一问。」
@@ -117,13 +123,21 @@ IF LOCAL
 	IF FLAG:時間停止
 	ELSEIF TALENT:6:恋慕
 		;@AT 待自动测试 K6_301_恋慕
-		PRINTFORMW 「谢谢——不过下次，能换成咖啡吗？煮咖啡是斯塔的拿手好戏，可我想喝你泡的。」
+		PRINTFORMW 「谢谢——不过下次，能换成咖啡吗？煮咖啡我和斯塔都会啦，可我想喝你泡的。」
 	ELSEIF MARK:6:不埒刻印 == 3
 		;@AT 待自动测试 K6_301_不埒3
 		PRINTFORMW 「……（露娜乖乖捧着茶杯，不敢像平时那样挑三拣四。）」
 	ELSE
 		;@AT 待自动测试 K6_301_中立
-		PRINTFORMW 「茶啊……勉强收下吧。要是有咖啡豆，我可是会更高兴的哦？（暗示）」
+		PRINTFORMW 
+		SELECTCASE RAND:3
+			CASE 0
+				PRINTFORMW 「茶啊……要是有别的饮品，我可是会更高兴的哦？」
+			CASE 1
+				PRINTFORMW 「呼呼，你还是挺机灵的嘛。」
+			CASEELSE
+				PRINTFORMW 「哼，只像有我这样强大的妖精，才懂得欣赏茶和咖啡呢。」
+		ENDSELECT
 	ENDIF
 ENDIF
 RETURN 1

@@ -5,7 +5,7 @@
 ;（弹幕由引擎在真实对战中派发，只能手动测试）
 ;※※※※※※※※※※※※※※※※※※※※※※※※※
 @M_KOJO_MESSAGE_COM_K6_DANMAKU(ARGS, ARG)
-#DIMS ARGS
+;注意：ARGS 是引擎内置的位置字符串参数，不能 #DIMS 声明（会报"变量名为Emuera所使用"）
 SELECTCASE ARGS
 	CASE "戦闘前"
 		;@AT 待手动测试 K6_DANMAKU_戦闘前

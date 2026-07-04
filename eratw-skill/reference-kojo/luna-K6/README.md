@@ -1,33 +1,33 @@
-# luna-K6 — 露娜切露德 (Luna Child), a modern worked example
+# luna-K6 —— 露娜切露德（Luna Child），现代口上范例
 
-A **fresh, from-scratch kojo for Luna Child (K6)**, authored with this skill and used as the live testbed for the autotest pipeline (`../../references/11-autotest-pipeline.md`).
+从零编写的**露娜切露德（K6）口上**，用本 skill 的方法论生成，同时作为自动测试流程的实测用例（见 `../../references/11-autotest-pipeline.md`）。
 
-Unlike `reimu/` (an older monolithic filled example) this one is written to current conventions:
+与 `reimu/`（较老的单体填充范例）不同，这份严格遵循当前规范：
 
-- **Full modern multi-file split** — one file per category (`イベント`, `日常系コマンド`, `派生コマンド`, `カウンター`, `弾幕勝負`, `刻印取得`, `日記`, `セクハラコマンド`, `性交系コマンド`, `加虐系コマンド`, `絶頂`, `関数ライブラリ`, `of_new_kojo_api`).
-- **Chinese prose + Chinese `;` comments**, engine identifiers left in Japanese.
-- **Canon persona**: timid #1-coward / argumentative moonlight fairy, night-owl (「因夜失眠」), sound-erasing (响指消音), trips constantly, covets coffee; frequent Sunny (K5) / Star (K7) trio flavor.
-- All the SKILL §1 pitfalls handled deliberately: same-cell guard on `EVENT_1/2/3`, silent `GRAVITY`, `#DIM`/`#DIMS` on `GIFT`/`DIARY_TEXT`/`RUN_INTO`, command IDs verified against `Train.csv`, UTF-8 BOM.
+- **完整的现代多文件拆分** —— 每个类别一个文件（`イベント`、`日常系コマンド`、`派生コマンド`、`カウンター`、`弾幕勝負`、`刻印取得`、`日記`、`セクハラコマンド`、`性交系コマンド`、`加虐系コマンド`、`絶頂`、`関数ライブラリ`、`of_new_kojo_api`）。
+- **中文台词 + 中文 `;` 注释**，引擎标识符保持日文原样。
+- **原作人设**：三妖精里的头号胆小鬼、爱讲理的月光妖精；夜猫子（「因夜失眠」）、消音能力（响指消音）、动不动摔跤、觊觎咖啡；频繁穿插桑尼（K5）/斯塔（K7）的三妖精互动。
+- SKILL §1 的坑全部有意规避：EVENT_1/2/3 的同格守卫、静默的 GRAVITY、GIFT/DIARY_TEXT/RUN_INTO 的 `#DIM`/`#DIMS`、指令号对照过 `Train.csv`、UTF-8 带 BOM。
 
-## Content register
+## 内容尺度
 
-Daily / social / event dialogue is richly filled (SFW-forward). Adult-category commands (`性交系`, `加虐系`, `絶頂`, `353`) are **structural stubs** (`LOCAL = 0`) for the author to fill.
+日常/社交/事件对话已充分填写（偏向 SFW）。成人类指令（`性交系`、`加虐系`、`絶頂`、353）是**结构桩**（`LOCAL = 0`），留给作者填写。
 
-## Autotest tags
+## 自动测试标记
 
-Testable dialogue regions carry a one-line status tag:
+可测试的对话区块上方带一行状态标记：
 
 ```
-;@AT <status> <TID>       e.g.  ;@AT 待自动测试 K6_300_恋人
+;@AT <状态> <TID>       例如  ;@AT 待自动测试 K6_300_恋人
 ```
 
-- `<status>` ∈ `待自动测试 · 待手动测试 · 测试通过 · 测试失败`
-- `<TID>` is a stable join key so a script can map test output back to the source region and rewrite the flag.
+- `<状态>` ∈ `待自动测试 · 待手动测试 · 测试通过 · 测试失败`
+- `<TID>` 是稳定的唯一联结键，脚本据此把测试输出回写到对应源码区块的状态标记上。
 
-## Status
+## 状态
 
-**WIP.** Content is complete and passes the §2 static verification. Still in progress: finishing the tagging pass across all files, the autotest harness (`M_KOJO_K6_AUTOTEST.ERB`, guarded by `TCVAR:6:399`), and the end-to-end pipeline run. See `../../../HANDOFF.md`.
+**进行中。** 内容已完成并通过 §2 静态校验；自动测试骨架（`M_KOJO_K6_AUTOTEST.ERB`，用 `TCVAR:6:399` 守卫）与 会話 钩子已就位；`日常系/派生/カウンター/日記/弾幕/刻印` 已打标记，`イベント` 事件区块待与集成测试监视器一起补齐。详见 `../../../HANDOFF.md`。
 
-> These `.ERB` files are a **copy** of the working kojo under the game tree
-> (`ERB/…/006 Luna [ルナ]/露娜切露德_重制/`). The game install is the source of truth;
-> this copy is here as a skill reference.
+> 这些 `.ERB` 是游戏目录下工作口上的**副本**
+> （`ERB/…/006 Luna [ルナ]/露娜切露德_重制/`）。游戏安装目录才是真源，
+> 此副本仅作 skill 参考。

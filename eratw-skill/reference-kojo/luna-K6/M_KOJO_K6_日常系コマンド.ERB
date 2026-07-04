@@ -159,12 +159,26 @@ CALL M_KOJO_MESSAGE_COM_K6_302_1
 RETURN RESULT
 
 @M_KOJO_MESSAGE_COM_K6_302_1
+;302 身体接触=常用按钮，多备几层分支（心情/关系/好感度），别一直用生疏语气。
+;好感度参考：>=500 渐熟络，>=1000 已有点心动。想省事可每层 SELECTCASE 只填一个 CASE、余下留白让作者补。
 LOCAL = 1
 IF LOCAL
 	IF FLAG:時間停止
+	ELSEIF CFLAG:6:心情不快
+		;@AT 待自动测试 K6_302_心情差
+		PRINTFORMW 「……现在别碰我啦。哼，今天心情不好。」
 	ELSEIF TALENT:6:恋人
 		;@AT 待自动测试 K6_302_恋人
 		PRINTFORMW 「唔……这样贴着，好安心。连夜里的失眠，好像都能好一点了。」
+	ELSEIF TALENT:6:恋慕
+		;@AT 待自动测试 K6_302_恋慕
+		PRINTFORMW 「碰、碰哪里呢……！唔，倒也不是说讨厌啦……只、只此一次哦。」
+	ELSEIF TALENT:6:思慕 || CFLAG:6:好感度 >= 1000
+		;@AT 待自动测试 K6_302_思慕心动
+		PRINTFORMW 「真是的，突然凑这么近……人类的胆子倒是不小嘛。（她别过脸，耳朵却红了。）」
+	ELSEIF CFLAG:6:好感度 >= 500
+		;@AT 待自动测试 K6_302_熟络
+		PRINTFORMW 「唔，又来啦。……看在还算熟的份上，这次就不消音赶你走了。」
 	ELSE
 		;@AT 待自动测试 K6_302_中立
 		PRINTFORML 「哇、哇！突、突然碰过来干什么啦！」

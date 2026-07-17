@@ -43,11 +43,11 @@ Convention: `<NAMESPACE>:<CHAR_ID>:<SLOT>` (defaulting CHAR_ID to TARGET if omit
 | Global | Means |
 |---|---|
 | `FLAG:slot` (or `FLAG:NUMBER`) | Global flags. `FLAG:70` = time-stop (alias `FLAG:時間停止`); `FLAG:扮演` = role-play target char ID; `FLAG:出禁人数` = banned-char count; `FLAG:周回数` = NG+ cycle; `FLAG:口上文本設定`, `FLAG:口上色`, `FLAG:口上セレクタ`, `FLAG:約会的对象`, `FLAG:甲斐性無`, `FLAG:ファッション`. |
-| `TIME` | Minutes-of-day. |
-| `TIME:2` | Hour bucket. |
+| `TIME` | Minutes-of-day (0–1439). Use for precise windows: `SELECTCASE TIME / CASE 480 TO 720` = 08:00–12:00. |
+| `TIME:2` | **Daypart bucket, values 1–7** (NOT hour-of-day, NOT 0-based): `1`=早朝(4–6h) `2`=正午前(6–12) `3`=昼(12–15) `4`=昼下がり(15–18) `5`=夕(18–20) `6`=夜(20–23) `7`=深夜(23–4). So `1–4`=daytime, `5–7`=night (`TIME:2 < 5` ⇔ sunlight, `>= 5` ⇔ moonlight). There is no `0`; guard bodies must not branch on `CASE 0`. |
 | `TIME:5` | Weather phase (4-7 = rain, 5 = heavy rain). |
 | `DAY` (= `DAY:0`) | Game day count. |
-| `DAY:2` | Month. |
+| `DAY:2` | Month = **season** in this fork's 4-month calendar: `1`=春 `2`=夏 `3`=秋 `4`=冬 (months are named 春之月/夏之月/…). |
 | `DAY:3` | Day-of-month. |
 | `MAIN_MAP` | Current world-map ID (0=Hakurei, 1=Myouren, 2=Human Village, 3=Scarlet, 4=Bamboo, 5=Magic Forest, 6=Sanzu, 7=Tengu foot, 8=Tengu peak, 9=Underground, …). |
 | `SELECTCOM` | Currently-selected command ID (mutable). |
@@ -65,4 +65,20 @@ Convention: `<NAMESPACE>:<CHAR_ID>:<SLOT>` (defaulting CHAR_ID to TARGET if omit
 | `LINECOUNT` | Current cursor line. |
 
 ---
+
+### 4.3 Location codes (`現在位置` / `自宅位置` / `初期位置`)
+
+Location codes are **composite**: the hundreds-and-up digits encode the region (world map), the last two digits the spot. `CFLAG:MASTER:現在位置 / 100` recovers the region; the visit handler uses exactly this (`COMF697 部屋を訪ねる.ERB`). Spot names live in `CSV/Str.csv`.
+
+Three coexisting namespaces (seen for the same room):
+- **Absolute base rooms `0–99`** — a character's real interior room *on its own home map*, e.g. `33 = 露娜私室`, `32 = 桑尼私室`. `CFLAG:MASTER:現在位置 == 33` means "physically standing in that room", only reachable when MASTER co-resides on that 家 map.
+- **Region nodes `~6000+`** — outdoor/area cells of a region walked via 散步/移動, e.g. `6005 = 妖精的大樹`, `6002 = 神社境内`.
+- **`8000+` mirror** — a parallel copy of the base rooms (`8033 = 露娜私室`) used in some non-resident contexts.
+
+**Shared "拠点共通" rooms are computed** (`ERB/MOVEMENTS/物件関連/PLACE_拠点共通.ERB`), so their codes are region-dependent (often 3-digit):
+- `OMANEKIBEYA()` = 待客室 = `98 + MAIN_MAP*100`
+- `SUKIMA()` = 隙間空間 = `99 + MAIN_MAP*100`
+- `ROAD_TO(mapid)` = 约会道中 = `97 + mapid*100`
+
+**Pitfall for room-specific dialogue** (e.g. "her decorated bedroom" lines): visiting a *non-resident* character's room via 訪問房間[697]→部屋に入る (`OMANEKI_ENTER`) teleports **both** MASTER and owner to `OMANEKIBEYA()` (the generic 待客室), **not** the owner's real room code. So her real room (e.g. `33`) is only occupied when MASTER co-resides on her map; otherwise you meet in `98 + MAIN_MAP*100`. Gate room-flavored口上 on the real base code, and remember the visited case lands in 待客室 instead. Confirm actual codes in-game with `PRINTFORML {CFLAG:MASTER:現在位置}`.
 

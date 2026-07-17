@@ -100,7 +100,7 @@ You only need to remember these. Anything not in this list is author-private (fi
 **Hooks (less common)**:
 | Label | Notes |
 |---|---|
-| `@SPECIALDAY_EVENT_K{id}` | Anniversary / holiday. Branch on `DAY:2` (month) and `DAY:3` (day). |
+| `@SPECIALDAY_EVENT_K{id}` | Anniversary / holiday. Branch on `DAY:2` (month) and `DAY:3` (day). **⚠ NOT engine-dispatched** — the engine's `KOJO_MESSAGE` router never builds a `SPECIALDAY` label. It is a kojo-internal subroutine you must `CALL` yourself from a real engine event (convention: inside `@M_KOJO_EVENT_K{id}_1`, after a date check — see こいし K38 `M_KOJO_K38_イベント.ERB` `CALL SPECIALDAY_EVENT_K38`). Defining it without a matching `CALL` = dead code (fires never). |
 | `@K{id}_BEFORETRAIN` (or `@M_KOJO[%RESULTS%_]_BEFORETRAIN_K{id}`) | Day-start state-machine. |
 | `@RUN_INTO_K{id}(MAP_ID)` | Random encounter on map. |
 | `@KOJO_SF_CONTRACT_EVENT_K{id}(ARGS)` | "Sex friend" agreement. |

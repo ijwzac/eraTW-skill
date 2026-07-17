@@ -265,20 +265,79 @@ Write-Host "   游戏已关闭 —— 正在统计结果" -ForegroundColor Cyan
 Write-Host "  ============================================================" -ForegroundColor Cyan
 Start-Sleep -Milliseconds 400
 
-# ── 编译错误早期检测：cliplog 很短(<50行)且出现「Emuera停止运行」→ 多半是口上编译/解释错误导致游戏刚启动就 halt ──
+# ============================================================
+#  崩溃 / 错误诊断 —— 区分两种情况，处置不同
+#    A. 编译 / 脚本错误：cliplog 很短(<50行)且含「Emuera停止运行」→ 游戏【没真正跑起来】。
+#       → 提示 + 把 emuera.log 尾部并进 cliplog 供 AI 定位，然后【直接结束、不显示 autotest/mt】
+#         （游戏没跑，那些统计全是空/误导）。
+#    B. 运行中崩溃：emuera.log 新鲜(几分钟内)且末尾含「错误发生/错误内容/函数调用栈」→ 游戏【跑到一半崩了】。
+#       剪贴板抓取(cliplog)常抓不到引擎抛的异常堆栈——它是引擎异常处理器直接写屏/写 emuera.log 的，
+#       不走 PRINT→剪贴板那条路，故 clip_tap 轮询不到。这里从 emuera.log 把它捞出来并进 cliplog + 提示玩家。
+#       这种情况 autotest/mt 【照常显示】（测试套件可能已跑完一部分，结果有价值）。
+#  说明：emuera.log 由引擎写在【游戏根目录】，本脚本启动时已删过一次，故存在即本次会话；只在
+#        加载/运行时错误/显式保存时更新（不像剪贴板是实时流），所以拿它专门兜「运行中崩溃」这个盲区。
+# ============================================================
+$emuLog  = Join-Path $root 'emuera.log'
+$crashRe = '错误发生|错误内容|函数调用栈'
+
+# 取 emuera.log 尾部（仅当新鲜：5 分钟内），两种情况都用得上
+$emuTail = $null; $emuHasCrash = $false
+if (Test-Path $emuLog) {
+    $ageMin = ((Get-Date) - (Get-Item $emuLog).LastWriteTime).TotalMinutes
+    if ($ageMin -le 5) {
+        try {
+            $emuAll  = [System.IO.File]::ReadAllText($emuLog, $utf8n) -split "`r?`n"
+            $emuTail = $emuAll[[Math]::Max(0, $emuAll.Count - 20)..($emuAll.Count - 1)]
+            if ($emuTail -match $crashRe) { $emuHasCrash = $true }
+        } catch {}
+    }
+}
+
+# 把 emuera.log 尾部并进 cliplog（带醒目分界，供 AI 直接读到）
+function Add-EmuTailToCliplog($why) {
+    if (-not $emuTail) { return }
+    $sep = "`r`n===== [启动器附加] emuera.log 末尾 20 行（$why；剪贴板未必抓到引擎异常堆栈）=====`r`n"
+    [System.IO.File]::AppendAllText($log, $sep + (($emuTail -join "`r`n")) + "`r`n", $utf8n)
+}
+
+# ---- A. 编译 / 脚本错误：游戏没真正跑起来 → 提示后直接结束，不显示 autotest/mt ----
+$compileError = $false
 if (Test-Path $log) {
     $clLines = @(Get-Content $log -Encoding UTF8)
-    if ($clLines.Count -lt 50 -and ($clLines -match 'Emuera停止运行')) {
-        Write-Host ""
-        Write-Host "  ============================================================" -ForegroundColor Red
-        Write-Host "   [!!] 检测到疑似【编译 / 脚本错误】——游戏刚启动就停止运行了。" -ForegroundColor Red
-        Write-Host "  ============================================================" -ForegroundColor Red
-        Write-Host "   实录 cliplog.txt 很短（$($clLines.Count) 行）且出现「Emuera停止运行」，" -ForegroundColor Yellow
-        Write-Host "   通常是某个口上文件有编译错误（警告Lv2 / 无法解释的行）导致 halt。" -ForegroundColor Yellow
-        Write-Host "   请把 cliplog.txt 发给 AI，让它查看并修正错误，然后重新启动本工具。" -ForegroundColor Yellow
-        Write-Host "   文件：$log" -ForegroundColor Yellow
-        Write-Host ""
+    if ($clLines.Count -lt 50 -and ($clLines -match 'Emuera停止运行')) { $compileError = $true }
+}
+if ($compileError) {
+    Add-EmuTailToCliplog '编译/脚本错误'
+    Write-Host ""
+    Write-Host "  ============================================================" -ForegroundColor Red
+    Write-Host "   [!!] 检测到疑似【编译 / 脚本错误】——游戏刚启动就停止运行了。" -ForegroundColor Red
+    Write-Host "  ============================================================" -ForegroundColor Red
+    Write-Host "   实录 cliplog.txt 很短（$($clLines.Count) 行）且出现「Emuera停止运行」，" -ForegroundColor Yellow
+    Write-Host "   通常是某个口上文件有编译错误（警告Lv2 / 无法解释的行）导致 halt。" -ForegroundColor Yellow
+    if ($emuTail) { Write-Host "   已把 emuera.log 末尾（含具体文件/行号）并进 cliplog.txt 末尾，方便 AI 直接定位。" -ForegroundColor Yellow }
+    Write-Host "   请把 cliplog.txt 发给 AI，让它查看并修正错误，然后重新启动本工具。" -ForegroundColor Yellow
+    Write-Host "   文件：$log" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "   （游戏没有真正跑起来，故跳过自动/手动测试统计——那些结果此时是空的、只会误导。）" -ForegroundColor DarkGray
+    Read-Host "`n  按回车关闭"
+    exit 0
+}
+
+# ---- B. 运行中崩溃：游戏跑到一半崩了 → 并进 emuera.log + 提示玩家，autotest/mt 照常 ----
+if ($emuHasCrash) {
+    Add-EmuTailToCliplog '游戏运行中崩溃'
+    Write-Host ""
+    Write-Host "  ============================================================" -ForegroundColor Red
+    Write-Host "   [!!] 检测到【游戏运行中崩溃】——玩到一半触发了某个 bug 导致游戏停止运行。" -ForegroundColor Red
+    Write-Host "  ============================================================" -ForegroundColor Red
+    Write-Host "   引擎的错误堆栈剪贴板抓不到，已从 emuera.log 捞出末尾 20 行并进 cliplog.txt 末尾。" -ForegroundColor Yellow
+    Write-Host "   请把 cliplog.txt 发给 AI 让它据此修正，然后重新启动本工具。" -ForegroundColor Yellow
+    Write-Host "   崩溃堆栈（emuera.log 末尾）：" -ForegroundColor Yellow
+    foreach ($ln in $emuTail) {
+        $sLine = $ln; if ($sLine.Length -gt 100) { $sLine = $sLine.Substring(0,99) + '…' }
+        if ($sLine.Trim()) { Write-Host "     $sLine" -ForegroundColor DarkGray }
     }
+    Write-Host ""
 }
 
 $atBlock = Get-AutotestBlock

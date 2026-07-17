@@ -7,7 +7,8 @@
 打磨 **eratw-skill**（帮 LLM 写 eraTW 角色口上的 Claude Skill），并以从零写 **露娜切露德(K6)** 口上作为方法论实测用例。仓库 `github.com/ijwzac/eraTW-skill`（用户=ijwzac），工作副本在 `learning/`。
 
 ## 当前架构（已实测跑通）
-- **半自动测试流水线**：双击 `learning/eratw-skill/run_eratw_test.bat`（以 `-STA` 启动 `start_pipeline.ps1`）→ 选 dev/player 版 → 启游戏 + 后台 clip_tap 实时抓词到 `cliplog.txt` → 关游戏后扫标记、回写 `;@AT` 状态、生成 `test_result.txt`。clip_tap 现传 `-MaxSeconds 86400` 且监控循环自愈重启（修了 60 分钟自停）。
+- **半自动测试流水线**：双击 `learning/eratw-skill/run_eratw_test.bat`（以 `-STA` 启动 `start_pipeline.ps1`）→ 选 dev/player 版 → 启游戏 + 后台 clip_tap 实时抓词到 `cliplog.txt` → 关游戏后**崩溃诊断**+扫标记、回写 `;@AT` 状态、生成 `test_result.txt`。clip_tap 现传 `-MaxSeconds 86400` 且监控循环自愈重启（修了 60 分钟自停）。
+- **崩溃诊断（关游戏后，references/11 §11.16）**：`cliplog`＝剪贴板实时流；`emuera.log`＝引擎写在游戏根目录、只在加载/错误/保存时更新。**运行时错误堆栈不走 PRINT→剪贴板，故 clip_tap 抓不到**——启动器改为：编译错误(cliplog<50行+「Emuera停止运行」)→跳过autotest/mt统计；运行中崩溃(emuera.log新鲜且末20行含「错误发生/错误内容/函数调用栈」)→把末20行并进cliplog+提示。**ps1 必须 UTF-8 带BOM**(PS5.1 读无BOM含中文ps1会GBK乱码)。
 - **自动测试 AUTOTEST**：`M_KOJO_K6_AUTOTEST.ERB` 测试套件，守卫＝`CFLAG:6:1099` 三态待命位（0 从未待命/玩家默认→永不触发；1 已待命→跑一次置 2；2 已跑）。开测＝启动器问「是否启用」时选启用（哨兵文件法，见 references/11 §11.14），读档+会話一次即触发；**同一存档重测**才需调试台输 `CFLAG:6:1099 = 1`（哨兵只 arm 没跑过的存档——`!= 2` 守卫承重、不可去）。判定＝END 哨兵门控（`at_update.ps1`）。**不再用 DEBUGGERR/TCVAR:399**。
 - **300 候选池确定性测试**：`CFLAG:6:1098`＝强制台词号（>0 跳过所有随机直接演该编号），harness 逐条 set 它。
 - **手动测试**：`待手动测试` 分支打 `PRINTL [[MT <TID>]]` 标记（其上一行 `SIF K{id}_MT_ON()` 守护），`manual_scan.ps1` 扫 cliplog 去重回写、`-Apply` 删标记时连带删守护行。

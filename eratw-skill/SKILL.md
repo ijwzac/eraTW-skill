@@ -80,8 +80,16 @@ This skill ships with a `references/` directory of supplementary docs (full labe
 | Official empty template (canonical multi-file skeleton + the doc-banner comments that ARE the spec) — **read first** before scaffolding from scratch | `reference-kojo/口上テンプレ/M_KOJO_KX_*.ERB`, especially `M_KOJO_KX_イベント.ERB` |
 | Filled-in worked-example kojo (when you need to see a real-world body, not just an empty stub) | `reference-kojo/reimu/M_KOJO_K1_*.ERB` (and `霊夢さんのreadme.txt`); grep specific commands as needed |
 | First-party helper functions (`ASK_YN`, `ASK_M`, `TEXTR`, `HPH_PRINT`, `FIRSTTIME`, `AddEXP`) — what they do and when to use them | `references/03-engine-helpers.md` §5.2–§5.6.1 |
+| **命令速查：某命令号能读哪些 state（`TFLAG:193` 成败 + 命令专属变量）、口上标签、触发/分发要点 —— 写任何 `_COM_K{id}_{号}` 命令体前必查该命令那一节** | `references/12-命令速查.md` |
+| **高频惯用法目录：作者通行的成句写法（同房判定、关系分层、随机池、时段门控…），可直接照抄** | `references/13-高频惯用法.md` |
+| **引擎行为源文件：命令/事件的"语义与分发"（`KOJO_MESSAGE.ERB` 分发器、`COMMON.ERB` helper 库、`EVENT_MESSAGE_COM300/400.ERB` 命令默认叙述）—— 命令速查不够时来这查/grep** | `references/data/engine/`（见其 `README.md`） |
+| **日记系统（DIARY）：4 标签职责、`DIARY` 状态机 0/1/2/3、`PAGESET`、每日挑页、5 大坑、正确骨架** | `references/14-日记系统.md` |
+| **依赖系（IRAI 委托）：`@M_KOJO_IRAI` 标签、ROLE/SCENE 枚举、`依頼名` CASE 值、骨架、debug 触发法** | `references/15-依赖系.md` |
+| **刻印(MARK)系统：全表、不埒/反発刻印怎么获得(阈值)/消除/机械影响、`MARK:不埒刻印==n` 台词分层、`MARKCNG`+`TFLAG:24` 瞬时旁白、debug 增减** | `references/16-刻印系统.md` |
 
 **For chatbot mode**, when you need any of the above, tell the user verbatim: *"Please upload `references/<filename>` from the eraTW-skill repository, or paste its contents."* Always name the **specific file** — don't say "upload the data" generically.
+
+> **扩充本 SKILL 的方法论（枚举 + 样例双驱动）。** 早期这套 references 是"样例驱动"的——研读若干现成口上、把见到的东西写下来；结果被样例用到的命令/helper 有成段讲解，没被用到的（如 403/415/416、`SHIRAHU` 的同房惯用法）要么只在某张表里留一格、要么散落在打包的原始 CSV 里没被消化，导致写作时检索不到。**扩充时务必同时"枚举驱动"**：把权威枚举表逐条过一遍再消化——`Train.csv` 每个命令、`COMMON.ERB` 每个 helper、各 `EVENT_MESSAGE_COM*.ERB` 的命令 state 语义——而不是只补样例里碰巧出现的那些。新沉淀的通用知识写进 `references/12-命令速查.md`（命令级 state）、`references/13-高频惯用法.md`（成句套路）、`references/data/engine/`（行为源文件）。**新增的 SKILL 内容一律用中文描述**，仅标签名/代码标识符/必要术语保留原文（整份 SKILL 汉化是后续单独工程）。
 
 ### 0.5 If a user uploads existing kojo files
 
@@ -122,6 +130,10 @@ These are the bugs we see in nearly every first-pass kojo generation. Hold them 
 10. **Files must be UTF-8 with BOM**, ideally CRLF. Without BOM, Chinese characters in some string contexts silently break. Write tools default to LF/no-BOM; prepend BOM after every write/edit. → `references/10-encoding-and-tools.md`
 11. **Display name in `CSV/Chara/Chara<N> *.csv` must match what your kojo prose calls the character.** The engine prints `%CALLNAME:N%` from CSV — if your prose calls her "莉莉卡" but the CSV says "莉莉喀", the player sees both inconsistently. Check `名前` and `呼び名` rows before authoring; edit CSV if you want a different display name.
 12. **An early-return `IF` branch suppresses everything below it.** Bodies that gate broad conditions (room class, weather, time-of-day) at the top of a cascade will block all the rich relationship content for most of the game. RAND-gate broad conditions, or move them inside relationship branches as flavor sub-conditions, instead of as early-return blockers.
+13. **写任何命令处理体前，先查该命令能读哪些 state —— 别凭记忆猜变量名。** 顺序（拉取变推送）：
+    1. **先查 `references/12-命令速查.md` 里该命令那一节**，拿到它的口上标签、`TFLAG:193` 成败、以及命令专属状态变量（如演奏 416 的 `TFLAG:使用楽器`、劝酒 332 的 `BASE:酒気`、午睡 417 的 `CFLAG:陪睡中`）及各取值含义。
+    2. **速查里没有 / 资料不足**：`grep "^{号}," references/data/Train.csv` 确认命令名 → grep 现存口上里该命令顶部的 banner 注释（`grep -rn "_COM_K.*_{号}" 個人口上/` 看多个作者的 banner，去重收敛）→ grep 引擎命令语义（`references/data/engine/EVENT_MESSAGE_COM{3,4}00.ERB`，或游戏里 `ERB\コマンド関連\COMF\COMF{号}*.ERB` 的命令主体）。
+    3. **仍不清楚**：派一个 Explore agent 去游戏文件夹（`ERB\` 全树）检索该命令/变量——这是补资料的正道，不要凭"这个命令应该有个 XX 变量"臆测。查到的新事实若属通用知识，回填进 `references/12` 与 `references/data/engine/`。
 
 ---
 
@@ -163,12 +175,14 @@ grep -l "@M_KOJO_EVENT_K[0-9]\+_[123](" *.ERB | while read f; do
 done
 
 echo "=== IF / ENDIF balance per file ==="
+# Invariant: one ENDIF per block-opening IF. ELSEIF (starts 'E') and SIF (starts 'S')
+# are NOT block openers and are naturally excluded by anchoring on '^\s*IF\b'.
+# (Do NOT compute (IF+ELSEIF)-SIF — that only balances when ELSEIF count == SIF count,
+#  so a body full of SIF-guarded [[MT]] markers throws false positives.)
 for f in *.ERB; do
-    ifs=$(grep -cE "^[[:space:]]*(IF|ELSEIF)\b" "$f")
+    ifs=$(grep -cE "^[[:space:]]*IF\b" "$f")
     ends=$(grep -cE "^[[:space:]]*ENDIF\b" "$f")
-    sif=$(grep -cE "^[[:space:]]*SIF\b" "$f")
-    expected=$((ifs - sif))   ; SIF has no matching ENDIF
-    [ "$ends" -eq "$expected" ] || echo "$f: IF/ELSEIF (excl SIF)=$expected, ENDIF=$ends"
+    [ "$ends" -eq "$ifs" ] || echo "$f: IF (block openers)=$ifs, ENDIF=$ends"
 done
 
 echo "=== SELECTCASE / ENDSELECT balance per file ==="
@@ -251,6 +265,8 @@ Each `警告Lv2:` line tells you:
 4. **Confirm with the user**: «请重新启动游戏，看看 `警告Lv2:` 行有没有消失。» Repeat until clean.
 
 **Don't move on to runtime testing until startup is clean.** A game with compile errors at launch may *appear* to run but the affected labels will be silently broken.
+
+**⚠️ Newly-added label does nothing in-game, but there's NO compile error? Suspect `lazyloading.dat` FIRST — before touching the code.** With `USELAZYLOADING:YES` (player default), a **brand-new** label you just added is not in the stale symbol cache, so the engine acts as if it doesn't exist and falls through to generic narration (you see the command's default banner but none of your kojo lines). Body edits to *existing* labels usually DO show — that asymmetry is the confusing part. Delete `lazyloading.dat` in the game root and relaunch (the engine rebuilds it). The autotest launcher does this automatically; a manual exe launch does not. Full detail: `references/11-autotest-pipeline.md` §11.6.
 
 ### 3.3 Runtime issues — proactive debug-print workflow
 
@@ -617,6 +633,56 @@ For sex commands (60-77, 95, plus 逆アナル 90-95), add intermediate guards o
 ### 9.4 Early-return warning
 
 Every early-return condition above the TALENT cascade *suppresses all relationship content below it*. For broad conditions (room class, weather, time-of-day), prefer RAND-gating or moving the condition inside relationship branches as flavor sub-conditions, instead of as an early-return blocker.
+
+### 9.5 内容自查：生成完一段对话后，回头过一遍这两点
+
+写完一条命令/事件的台词后，在交还前**自己审一遍**（这是内容质量检查，不是 §2 的机械校验）：
+
+**① 称呼玩家 & 明显与好感相关的内容，必须随好感度变化——别锁死在生疏关系上。**
+一条命令若只有「恋人 / 恋慕 / ELSE」三档，那个 `ELSE` 会同时覆盖**萍水相逢的陌生人**和**好感度 1400 的好朋友**——于是一个亲密玩家做出亲吻、请客、一起玩这类举动时，角色却用陌生人的冷淡语气回应（例：亲吻命令的 `ELSE` 是「你干什么！」+ 后退摔倒；一个 思慕/好朋友 玩家不该吃这个反应）。**修法二选一**：要么按 `CFLAG:{id}:好感度` 或关系 `TALENT` 多加中间档（思慕/熟络/心动），要么直接用 `%CALLNAME:MASTER%`（玩家名）而非「人类」「你这家伙」这类**锁定生疏**的称呼。好感度参考刻度（因作品/角色而异，仅作量级参考）：
+
+| 好感度 | 大致关系 |
+|---|---|
+| < 250 | 生疏（初识/防备） |
+| < 500 | 点头之交 |
+| < 1000 | 熟人 |
+| < 1500 | 好朋友 |
+| < 3000 | 非常要好，常已进入「思慕」（`TALENT:思慕` 门槛之一即 好感度≥1500） |
+| ≥ 3000 | 基本是恋慕/恋人 |
+
+**要结合上下文灵活判断，不是见「人类」就改。** 关键区分：
+- ❌ **锁定生疏**：「人类说要一起玩」——把玩家当外人陈述，任何好感度听着都像不熟。这种要改。
+- ✅ **强调种族 + 傲娇**：「哼，人类也想玩妖精的游戏？那你可得跟上我们的节奏哦」——这是在拿「人类 vs 妖精」的身份调侃/逞强，带傲娇味，**任何好感度都可能这么说**，合理，不必改。
+判据：这句话**换成恋人来说**还成立吗？成立（傲娇调侃）就留；不成立（暴露了「不熟」的前提）就按好感度分档或改用玩家名。
+
+**② 克制对角色某个标志性特点的反复描写。**
+把角色的招牌设定（能力、口癖、某个动作）**每一个分支都塞一遍**，读着就很「AI 完成命题作文」、不自然（例：露娜的「消音」能力若在会話、摸头、拥抱、接吻、礼物每条里都出现一次，就过量了）。让标志性特点**偶尔**出现、点到为止，其余分支用别的细节撑起人物。可参考 eratw 里其他角色口上的自然疏密度。**此项从简**——它是风格偏好、通常很安全，最终由用户拍板润色，不必花大量精力反复审查。
+
+**③ 会持续很久的状态，它的专属台词要【入候选池】，不要写成排他覆盖。**
+「约会中」这类状态**一持续就是几十个回合**，玩家在这期间会反复点「会話」。若写成
+`IF 约会中 → 演约会台词 / ELSE → 平时的候选池`，那整场约会就**只剩那一句**翻来覆去，丰富度断崖式下降。
+正确做法：把约会台词**按当前关系追加进候选池**，让它和平时的台词一起参与随机——约会味道点到为止，变化照旧：
+```erb
+IF CHK_DATENOW(CFLAG:MASTER:约会中) && FLAG:约会的对象 == TARGET
+    IF TALENT:{id}:恋人
+        pool:(LOCAL:1) = 70
+    ELSEIF …
+    ENDIF
+    LOCAL:1 += 1
+ENDIF
+```
+**排他覆盖只留给「压过一切」的短暂状态**：时间停止、睡眠、暴怒(318) 之类——这些状态下别的台词本来就说不通。
+判据：问自己「这个状态会持续多久？玩家在这期间会点几次这个按钮？」超过两三次，就该入池。
+
+**④ 增减好感度/信赖度等数值时，把变化打印出来。**
+玩家看不到内部变量。悄悄 `CFLAG:{id}:好感度 -= 30` 而不吭声，玩家既不知道被罚了、也学不到「这么做有代价」，行为反馈整个断掉：
+```erb
+;好感度不足 30 时只会扣到 0，故先算出【实际】扣掉多少再打印，别报一个没真扣满的数
+LOCAL = MIN(CFLAG:{id}:好感度, 30)
+CFLAG:{id}:好感度 -= LOCAL
+PRINTFORMW 【%CALLNAME:{id}%的好感度 -{LOCAL}　信赖度 -20】
+```
+注意打印的是**实际变化量**：有 clamp（下限 0、上限封顶）时，写死的字面量会撒谎。
 
 ---
 

@@ -1,76 +1,76 @@
-# EVENT_K_X subphase reference (ARG semantics per slot)
+# EVENT_K_X 子阶段参考（各槽位的 ARG 语义）
 
-**For the complete ARG-map table covering all 34 EVENT slots, see `01-engine-label-catalog.md` §2.4.2.** This file zooms in on the slots where the cell-guard pattern is critical (slots 1/2/3) and explains *why* the pattern is mandatory.
+**完整的 ARG 映射表覆盖全部 34 个 EVENT 槽位，见 `01-engine-label-catalog.md` §2.4.2。** 本文件聚焦于「单元格守卫」模式至关重要的那几个槽位（槽位 1/2/3），并解释*为什么*这个模式是必须的。
 
-The engine fires several EVENT slots **multiple times per turn** with `ARG` distinguishing the sub-phase. **If you ignore ARG**, the body fires for every sub-phase (3-5 times per visit) and the dialogue prints repeatedly. Always branch on ARG, and `RETURN 0` from each branch (so other sub-phases can match).
+引擎会**每回合多次触发**若干 EVENT 槽位，用 `ARG` 区分子阶段。**如果你无视 ARG**，body 就会在每个子阶段都触发（每次拜访 3-5 次），台词会重复打印。务必按 ARG 分支，并且**每个分支都 `RETURN 0`**（这样其他子阶段还能匹配）。
 
-Authoritative ARG semantics (cross-checked between `001 Reimu / 霊夢` filled-in kojo, the official empty template `reference-kojo/口上テンプレ/M_KOJO_KX_イベント.ERB`, and `口上作者様へ.txt`):
+权威的 ARG 语义（在 `001 Reimu / 霊夢` 的填充版口上、官方空模板 `reference-kojo/口上テンプレ/M_KOJO_KX_イベント.ERB`、以及 `口上作者様へ.txt` 三者之间交叉核对得出）：
 
-**`@M_KOJO_EVENT_K{id}_1(ARG, ARG:1)` — room/cell encounter.** Fires once **per cell transition the character makes on the same world map** as MASTER, even if MASTER is in a different cell. **Mandatory first guard:**
+**`@M_KOJO_EVENT_K{id}_1(ARG, ARG:1)` —— 房间/单元格遭遇。** 在角色于**与 MASTER 同一张世界地图**上每做一次单元格转移时触发一次，即便 MASTER 身处不同单元格也会触发。**必须的第一道守卫：**
 ```erb
 @M_KOJO_EVENT_K{id}_1(ARG, ARG:1)
 LOCAL = 1
 SIF !LOCAL || FLAG:時間停止
     RETURN 0
-;Engine fires this on every NPC cell-step. Reject when not co-located:
+;引擎在每次 NPC 单元格移动时都会触发这里。不在同一单元格时拒绝：
 SIF CFLAG:{id}:現在位置 != CFLAG:MASTER:現在位置
     RETURN 0
-;Then branch on ARG sub-phase:
+;然后按 ARG 子阶段分支：
 SELECTCASE ARG
-    CASE 1   ;MASTER walks in, char already in room
+    CASE 1   ;MASTER 走进来，角色已在房间内
         ...
         RETURN 0
-    CASE 2   ;char walks in, MASTER already in room
+    CASE 2   ;角色走进来，MASTER 已在房间内
         ...
         RETURN 0
-    CASE 3   ;char enters bathroom while MASTER bathing — joins
+    CASE 3   ;MASTER 洗澡时角色进入浴室 —— 一起洗
         ...
         RETURN 0
-    CASE 4   ;char enters bathroom, exits politely
+    CASE 4   ;角色进入浴室，礼貌地退出
         ...
         RETURN 0
-    CASE 5   ;char enters bathroom, MASTER kicks them out
+    CASE 5   ;角色进入浴室，被 MASTER 赶出去
         ...
         RETURN 0
 ENDSELECT
 RETURN 0
 ```
 
-**`@M_KOJO_EVENT_K{id}_2(ARG, ARG:1)` — morning.** Fires for every char on the same world-map as MASTER, every morning — even if char is in a different cell. **Same first guard required:**
+**`@M_KOJO_EVENT_K{id}_2(ARG, ARG:1)` —— 早晨。** 每天早晨，对与 MASTER 同一张世界地图上的每个角色都会触发 —— 即便角色身处不同单元格。**同样需要第一道守卫：**
 ```erb
 SIF CFLAG:{id}:現在位置 != CFLAG:MASTER:現在位置
     RETURN 0
 ```
 
-**`@M_KOJO_EVENT_K{id}_3(ARG, ARG:1)` — bedtime.** Same map-vs-cell distinction as `_2`. Same guard required.
+**`@M_KOJO_EVENT_K{id}_3(ARG, ARG:1)` —— 就寝。** 与 `_2` 有相同的「地图 vs 单元格」区分。需要同样的守卫。
 
-For other EVENT slots (4..34), see the table in `01-engine-label-catalog.md` §2.4.2 — most don't need the cell-guard (they're already gated by the trigger), but the pattern of "branch ARG, RETURN 0 per branch" applies universally for any slot where ARG has multiple values.
+其他 EVENT 槽位（4..34）见 `01-engine-label-catalog.md` §2.4.2 的表格 —— 大多数不需要单元格守卫（它们已被触发条件门控），但「按 ARG 分支、每个分支 RETURN 0」这个模式，对任何 ARG 有多个取值的槽位都普遍适用。
 
-**Why this isn't obvious from the engine source**: the dispatcher in `KOJO_MESSAGE.ERB` doesn't filter by current-cell; it filters only by *map presence*. The cell check is the kojo's responsibility. Most reference kojo include this guard but they don't emphasize it — it has to be observed by reading them.
+**为什么这从引擎源码里看不出来**：`KOJO_MESSAGE.ERB` 里的派发器**不**按当前单元格过滤；它只按*地图存在与否*过滤。单元格检查是口上自己的责任。大多数参考口上都包含这道守卫，但它们并没有强调它 —— 只能靠阅读它们观察出来。
 
 
 ---
 
-## Finding what each EVENT/SPEVENT slot & ARG means (authoritative)
+## 查明每个 EVENT/SPEVENT 槽位与 ARG 的含义（权威做法）
 
-The engine dispatches kojo events with `CALL KOJO_MESSAGE_SEND("EVENT"|"SP_EVENT", <slot>, ARG, <sub>[, ...])`, and **every call site is commented `;<口上名>,<sub>,<描述>`**. So the ground truth for "when does `@M_KOJO_EVENT_K{id}_<slot>` fire and what is each ARG sub-phase" is the callers, NOT this doc. Grep the engine (exclude `個人口上/`):
+引擎用 `CALL KOJO_MESSAGE_SEND("EVENT"|"SP_EVENT", <slot>, ARG, <sub>[, ...])` 来派发口上事件，而**每个调用点都带注释 `;<口上名>,<sub>,<描述>`**。所以「`@M_KOJO_EVENT_K{id}_<slot>` 何时触发、每个 ARG 子阶段是什么」的真相在调用方，**不在**本文档。去 grep 引擎（排除 `個人口上/`）：
 
 ```
 grep -rnB1 'KOJO_MESSAGE_SEND("EVENT", *<slot>' ERB/
 ```
 
-Richest call sites: `ERB/MOVEMENTS/MOVEMENT2.ERB` (@KITAKU 帰宅/约会), `ERB/COMMON.ERB`, `ERB/ANOTHER_TALK.ERB`, `ERB/MOVEMENTS/JOB_仕事開始終了処理.ERB`.
+最丰富的调用点：`ERB/MOVEMENTS/MOVEMENT2.ERB`（@KITAKU 帰宅/约会）、`ERB/COMMON.ERB`、`ERB/ANOTHER_TALK.ERB`、`ERB/MOVEMENTS/JOB_仕事開始終了処理.ERB`。
 
-**Confirmed mappings (this fork):**
+**已确认的映射（本 fork）：**
 
-| slot | 口上名 | fires when | ARG sub-phases (from call-site comments) |
+| slot | 口上名 | 触发时机 | ARG 子阶段（来自调用点注释） |
 |---|---|---|---|
-| EVENT 1 | 遭遇 | you & char share a cell | 1=你进来 2=她进来 3-5=浴室 6=外出遭遇 7=约会中撞见 8=当日室内首次问候 9=当日外出首次问候 (see §2.4.2) |
-| EVENT 2 | 朝(起床) | around her `CFLAG:起床時間` | (morning greeting) |
-| EVENT 3 | おやすみ(就寝) | around her `CFLAG:就寝時間` | 2=就寝前 3=睡眠中 7=部屋から出て寝た… |
-| EVENT 20 | **帰宅口上** | **date/outing end — @KITAKU** | **1=通常帰宅 2=约会中帰宅 3=玄関先見送り 4=邀去房间 5=同行 6=拒绝 7=今夜不想回 8=留宿 9=断った** |
+| EVENT 1 | 遭遇 | 你与角色同处一个单元格 | 1=你进来 2=她进来 3-5=浴室 6=外出遭遇 7=约会中撞见 8=当日室内首次问候 9=当日外出首次问候 (见 §2.4.2) |
+| EVENT 2 | 朝(起床) | 在她的 `CFLAG:起床時間` 前后 | (早晨问候) |
+| EVENT 3 | おやすみ(就寝) | 在她的 `CFLAG:就寝時間` 前后 | 2=就寝前 3=睡眠中 7=部屋から出て寝た… |
+| EVENT 20 | **帰宅口上** | **约会/外出结束 —— @KITAKU** | **1=通常帰宅 2=约会中帰宅 3=玄関先見送り 4=邀去房间 5=同行 6=拒绝 7=今夜不想回 8=留宿 9=断った** |
 | EVENT 21 | 陥落素質取得 | 关系升级 | 1=恋慕 3=爱欲 5=炮友 |
-| EVENT 26 | ONABARE(被撞见自慰) | — | 0/2/4 phases |
+| EVENT 26 | ONABARE(被撞见自慰) | — | 0/2/4 阶段 |
 | SP_EVENT 1/2/3 | 约会帰り里程碑/兜底 | 约会归途（玩家手动结束这条路） | 1=初吻 2=告白 **3=兜底：已初吻·未到告白时每次手动结束约会都走这里** |
 
 ### ⭐GIFT 事件的 ARG 分档（`@M_KOJO_EVENT_K{id}_GIFT`）
@@ -104,4 +104,4 @@ Richest call sites: `ERB/MOVEMENTS/MOVEMENT2.ERB` (@KITAKU 帰宅/约会), `ERB/
 - **玩家绝大多数是手动点「回家」结束约会 → 路径① → 初吻后每次都落 SP_EVENT 3。因此 `@M_KOJO_SPEVENT_K{id}_3` 才是实际游玩中最常触发的"约会归来"落点，应写丰富**（可按 思慕/恋慕/恋人 分层）。**别把它留空桩**——会导致"约会归来什么台词都没有"（露娜初版踩过这坑）。EVENT 20 那套要角色自然到点回家才走，玩家不一定碰得到。
 - （⚠本文档旧版曾断言"约会归来只走 EVENT 20 ARG 2、不走 SPEVENT_3"，只说对了路径②、漏了玩家最常走的路径①，已订正。）
 
-Char sleep/wake times are per-char in `CSV/Chara/CharaN.csv` (`就寝時間`/`起床時間`, minutes; `就寝` clamped ≤120=02:00).
+角色的睡眠/起床时间是逐角色配置在 `CSV/Chara/CharaN.csv` 里的（`就寝時間`/`起床時間`，单位分钟；`就寝` 被钳制到 ≤120=02:00）。

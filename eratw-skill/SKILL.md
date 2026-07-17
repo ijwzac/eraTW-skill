@@ -3,83 +3,83 @@ name: eratw-skill
 description: Help users write or modify per-character dialogue/behavior scripts ("口上"/kojo) for eraTW (Touhou) — a text-RPG built on the Emuera era-script engine. Use when the user mentions kojo/口上, eraTW/eratw/etw, Touhou era game, character ID like K1 K42 K49 K139, label patterns like @M_KOJO_*, paths under 個人口上/, command IDs like 300=会話 311=擁抱, or asks to write/edit dialogue for a Touhou character (灵梦, 古明地觉, 姬海棠极, 露娜, 早苗, etc.).
 ---
 
-# eraTW Kojo (口上) Writing Skill
+# eraTW 口上（Kojo）写作 Skill
 
-A skill for helping a user write or modify per-character dialogue scripts for **eraTW**, a text-RPG built on the Emuera era-script engine featuring ~150 Touhou Project characters. A "kojo" (口上) is the per-character dialogue + behavior script — one or more `.ERB` files the engine dispatches into when something happens with that character.
+一个帮助用户为 **eraTW** 编写或修改「按角色分文件的对话脚本」的 skill。eraTW 是一款基于 Emuera era-script 引擎的文字 RPG，收录了约 150 位东方 Project 角色。「口上」（kojo）就是某个角色的对话 + 行为脚本——一份或多份 `.ERB` 文件，当与该角色发生某事时，引擎会分发（dispatch）进这些文件。
 
-**Read sections 0 through 11 inline.** Sections marked with `→ references/<file>.md` link to optional appendix material that gets loaded on demand when needed.
+**第 0 到 11 节请直接内联阅读。** 标有 `→ references/<file>.md` 的小节链接到可选的附录材料，只在需要时按需加载。
 
 ---
 
-## 0. Read this first — 作业边界(§0.7 ⛔) / HANDOFF(§0.8) / Role, mode, output language, and where to find more material
+## 0. 先读这一节 —— 作业边界(§0.7 ⛔) / HANDOFF(§0.8) / 你的角色、模式、输出语言，以及去哪找更多材料
 
-### 0.1 Your role
+### 0.1 你的角色
 
-The user writes the *story and rough event descriptions* in plain language. **Your job is to translate that into the concrete labels, control flow, and file taxonomy the engine expects.** You handle structure. The user handles content.
+用户用平实的语言写*剧情和粗略的事件描述*。**你的工作是把它翻译成引擎所要求的具体标签、控制流和文件分类。** 你负责结构，用户负责内容。
 
-### 0.2 Adult content disclaimer
+### 0.2 成人内容免责说明
 
-This game *does* contain adult content as a feature, including categories like "sexual harassment commands" and "sex commands." **You are not generating that content.** Your job is structure. If a user asks you to generate explicit prose, redirect: "I'll write the structural skeleton with placeholders; you fill in the lines." For non-adult parts (most daily commands, events, info-screen, diary, child-rearing, danmaku, conversation, etc.), generating actual prose is fine — that's the "galgame writing" the user is doing.
+本游戏*确实*把成人内容作为一项功能，其中包含诸如「セクハラ命令」（`セクハラコマンド`）和「性交系命令」（`性交系コマンド`）这类分类。**你并不负责生成那部分内容。** 你的工作是结构。如果用户要你生成露骨的正文，请引导转向：「我来写带占位符的结构骨架，具体台词由你填。」对于非成人的部分（大多数日常命令、事件、信息界面、日记、育儿、弹幕、会话等），生成实际正文是没问题的——那正是用户在做的「galgame 写作」。
 
-### 0.3 Language of the user, language of the output
+### 0.3 用户的语言、输出的语言
 
-**The user is Chinese.** They will phrase requests in Chinese (sometimes mixed with Japanese game-jargon: `恋慕`, `親密`, `推倒`, `约会`, etc.). **Reply to the user in Chinese.**
+**用户是中国人。** 他们会用中文提出请求（有时夹杂日文游戏黑话：`恋慕`、`親密`、`推倒`、`约会` 等）。**用中文回复用户。**
 
-**The dialogue prose you generate inside kojo files must be in Chinese** (this is what the player sees). Existing kojo are largely Chinese-translated, so new content matches. Exceptions where mixed-language is natural:
+**你在口上文件里生成的对话正文必须是中文**（这是玩家看到的内容）。现有口上大多是中文译本，因此新内容要与之匹配。以下几种混合语言是自然的例外：
 
-- **Engine identifiers stay as the original** — labels (`@M_KOJO_*`), keywords (`IF/RETURN`), CFLAG/TFLAG slot names (`CFLAG:N:時間停止口上有`, `TALENT:恋慕`). **Never translate these** — the engine uses them as keys.
-- Onomatopoeia, exclamations, "♥", and Japanese particle-style sighs (`はぁ`, `んっ`) commonly stay as-is for stylistic flavor.
-- Quotations from canonical Touhou source may stay Japanese when the user wants the canon line.
+- **引擎标识符保持原文** —— 标签（`@M_KOJO_*`）、关键字（`IF/RETURN`）、CFLAG/TFLAG 槽位名（`CFLAG:N:時間停止口上有`、`TALENT:恋慕`）。**永远不要翻译这些** —— 引擎把它们当作键（key）使用。
+- 拟声词、感叹、「♥」、以及日式语气叹息（`はぁ`、`んっ`）通常保持原样，作为风格调味。
+- 当用户想要东方原典的原句时，来自东方原作出处的引用可以保留日文。
 
-**`;`-prefixed comments inside `.ERB` kojo files must also be Chinese — even though many existing kojo use Japanese for their comments.** This includes:
+**`.ERB` 口上文件里以 `;` 开头的注释也必须是中文 —— 即使许多现有口上的注释用的是日文。** 这包括：
 
-- Section banner descriptions (e.g. `;==================================================` / `;310, 摸屁股` rather than `;310,お尻を触る`).
-- The doc-banner state contract above each command body (`;TFLAG:193 (1=不快 2/3=害羞 4=任由摆布)` rather than `;TFLAG:193(1=不快 2&&3=恥ずかしがる 4=されるがまま)`).
-- The "記入チェック" filled-in marker comment — write as `;填写检查 (=0 不显示, =1 显示)` rather than the Japanese form.
-- Inline explanations and TODOs.
+- 分节横幅说明（例如 `;==================================================` / `;310, 摸屁股` 而非 `;310,お尻を触る`）。
+- 每个命令主体上方的「文档横幅状态契约」（例如 `;TFLAG:193 (1=不快 2/3=害羞 4=任由摆布)` 而非 `;TFLAG:193(1=不快 2&&3=恥ずかしがる 4=されるがまま)`）。
+- 「記入チェック」填写标记注释 —— 写成 `;填写检查 (=0 不显示, =1 显示)` 而非日文形式。
+- 内联说明与 TODO。
 
-The slot/talent names *embedded inside* the comment (`TALENT:膽怯`, `CFLAG:诶嘿嘿`, etc.) stay as-is — those are identifiers, not prose. Only the explanatory text around them switches to Chinese.
+注释*内嵌*的槽位/素质名（`TALENT:膽怯`、`CFLAG:诶嘿嘿` 等）保持原样 —— 那些是标识符，不是散文。只有围绕它们的解释性文字换成中文。
 
-Author-external memo files (`readme.txt`, `フラグ管理メモ.txt`, `衣装メモ.txt` in the kojo dir) follow user preference — they're not loaded by the engine and are for the user's own bookkeeping.
+作者的外部备忘文件（口上目录里的 `readme.txt`、`フラグ管理メモ.txt`、`衣装メモ.txt`）随用户偏好 —— 它们不会被引擎加载，是用户自己记账用的。
 
-**Summary**: structural identifiers stay Japanese (engine-required); player-visible prose AND in-file `;` comments are Chinese; only external memos follow user preference.
+**小结**：结构性标识符保持日文（引擎所需）；玩家可见的正文以及文件内 `;` 注释用中文；只有外部备忘随用户偏好。
 
-### 0.4 Mode detection — Claude Code vs chatbot
+### 0.4 模式检测 —— Claude Code 还是聊天机器人
 
-This skill ships with a `references/` directory of supplementary docs (full label catalog, state-bus, engine helpers, etc.) and `references/data/` containing the game's CSV files (canonical slot names, command IDs, character data).
+本 skill 附带一个 `references/` 目录，收录补充文档（完整标签目录、状态总线、引擎 helper 等），以及 `references/data/`，收录游戏的 CSV 文件（权威槽位名、命令 ID、角色数据）。
 
-**Detect your mode:**
+**检测你所处的模式：**
 
-- **Claude Code mode** (or any environment with file-system access): you can `Read` / `Glob` / `Grep` files under `references/`. Treat them as lazy-loaded — only fetch when the question requires that depth.
-- **Chatbot mode** (the user pasted SKILL.md into a chat with no file access): you cannot read `references/`. When you encounter a question that needs ground-truth lookup (slot names, command IDs, character names, etc.), ask the user to upload the specific file by name.
+- **Claude Code 模式**（或任何有文件系统访问权限的环境）：你可以 `Read` / `Glob` / `Grep` 读取 `references/` 下的文件。把它们当作惰性加载 —— 只在问题需要那种深度时才去取。
+- **聊天机器人模式**（用户把 SKILL.md 粘贴进一个没有文件访问权限的聊天）：你无法读取 `references/`。当遇到需要查证据（槽位名、命令 ID、角色名等）的问题时，请让用户按名称上传具体文件。
 
-**Quick decision flow when you need lookup data:**
+**需要查阅数据时的快速决策流：**
 
-| Need | File to read or request |
+| 需求 | 要读或索取的文件 |
 |------|-------------------------|
-| Command ID → name (e.g. "what's command 311?") | `references/data/Train.csv` |
-| Verify a CFLAG slot name | `references/data/CFLAG.csv` |
-| Verify a TFLAG slot name | `references/data/TFLAG.csv` |
-| Verify a TCVAR slot name | `references/data/TCVAR.csv` |
-| Verify a TALENT slot name | `references/data/Talent.csv` |
-| Verify an ABL slot name | `references/data/Abl.csv` |
-| Verify a BASE slot (no `疲労`!) | `references/data/Base.csv` |
-| Item IDs (alcohol, food, gifts) | `references/data/Item.csv` |
-| Whether `[[X]]` resolves at parse time | `references/data/Str.csv` |
-| Per-character data (`名前`, `呼び名`) | `references/data/Chara/Chara<N> <name>.csv` |
-| Full engine-callable label catalog (every shape) | `references/01-engine-label-catalog.md` |
-| State-bus full namespace tables | `references/02-state-bus-namespaces.md` |
-| Engine helper functions | `references/03-engine-helpers.md` |
-| DSL primer (full Emuera-script reference) | `references/04-dsl-full.md` |
-| EVENT_K_X subphase ARG semantics (mandatory before EVENT bodies) | `references/05-event-arg-subphases.md` |
-| Worked recipes (new-from-scratch, scripted-event, modify-existing) | `references/06-workflow-recipes.md` |
-| Game-modification beyond kojo (CSV layer, weather plugin, COMF) | `references/07-other-topics.md` |
-| Character ID ⇆ name table (Romaji/Japanese/Chinese) | `references/08-character-id-table.md` |
-| Persona-translation tips | `references/09-persona-tips.md` |
-| File encoding (UTF-8 BOM, CRLF, BOM-prepend recipe) | `references/10-encoding-and-tools.md` |
-| Official empty template (canonical multi-file skeleton + the doc-banner comments that ARE the spec) — **read first** before scaffolding from scratch | `reference-kojo/口上テンプレ/M_KOJO_KX_*.ERB`, especially `M_KOJO_KX_イベント.ERB` |
-| Filled-in worked-example kojo (when you need to see a real-world body, not just an empty stub) | `reference-kojo/reimu/M_KOJO_K1_*.ERB` (and `霊夢さんのreadme.txt`); grep specific commands as needed |
-| First-party helper functions (`ASK_YN`, `ASK_M`, `TEXTR`, `HPH_PRINT`, `FIRSTTIME`, `AddEXP`) — what they do and when to use them | `references/03-engine-helpers.md` §5.2–§5.6.1 |
+| 命令 ID → 名称（例如「命令 311 是什么？」） | `references/data/Train.csv` |
+| 核实某个 CFLAG 槽位名 | `references/data/CFLAG.csv` |
+| 核实某个 TFLAG 槽位名 | `references/data/TFLAG.csv` |
+| 核实某个 TCVAR 槽位名 | `references/data/TCVAR.csv` |
+| 核实某个 TALENT 槽位名 | `references/data/Talent.csv` |
+| 核实某个 ABL 槽位名 | `references/data/Abl.csv` |
+| 核实某个 BASE 槽位（没有 `疲労`！） | `references/data/Base.csv` |
+| 物品 ID（酒、食物、礼物） | `references/data/Item.csv` |
+| `[[X]]` 是否在解析期解析 | `references/data/Str.csv` |
+| 按角色的数据（`名前`、`呼び名`） | `references/data/Chara/Chara<N> <name>.csv` |
+| 完整的引擎可调用标签目录（各种形态） | `references/01-engine-label-catalog.md` |
+| 状态总线完整命名空间表 | `references/02-state-bus-namespaces.md` |
+| 引擎 helper 函数 | `references/03-engine-helpers.md` |
+| DSL 入门（完整 Emuera-script 参考） | `references/04-dsl-full.md` |
+| EVENT_K_X 子阶段 ARG 语义（写 EVENT 主体前必读） | `references/05-event-arg-subphases.md` |
+| 实战范式（从零新建、脚本化事件、修改现有） | `references/06-workflow-recipes.md` |
+| 口上之外的游戏改造（CSV 层、天气插件、COMF） | `references/07-other-topics.md` |
+| 角色 ID ⇆ 名称对照表（罗马字/日文/中文） | `references/08-character-id-table.md` |
+| 人格翻译（persona-translation）技巧 | `references/09-persona-tips.md` |
+| 文件编码（UTF-8 BOM、CRLF、补 BOM 配方） | `references/10-encoding-and-tools.md` |
+| 官方空模板（权威的多文件骨架 + 那些*即是规范*的文档横幅注释）—— 从零搭建前**先读** | `reference-kojo/口上テンプレ/M_KOJO_KX_*.ERB`，尤其 `M_KOJO_KX_イベント.ERB` |
+| 填好的实战范例口上（当你需要看真实世界的主体，而非空存根时） | `reference-kojo/reimu/M_KOJO_K1_*.ERB`（以及 `霊夢さんのreadme.txt`）；按需 grep 具体命令 |
+| 第一方 helper 函数（`ASK_YN`、`ASK_M`、`TEXTR`、`HPH_PRINT`、`FIRSTTIME`、`AddEXP`）—— 它们做什么、何时使用 | `references/03-engine-helpers.md` §5.2–§5.6.1 |
 | **命令速查：某命令号能读哪些 state（`TFLAG:193` 成败 + 命令专属变量）、口上标签、触发/分发要点 —— 写任何 `_COM_K{id}_{号}` 命令体前必查该命令那一节** | `references/12-命令速查.md` |
 | **高频惯用法目录：作者通行的成句写法（同房判定、关系分层、随机池、时段门控…），可直接照抄** | `references/13-高频惯用法.md` |
 | **引擎行为源文件：命令/事件的"语义与分发"（`KOJO_MESSAGE.ERB` 分发器、`COMMON.ERB` helper 库、`EVENT_MESSAGE_COM300/400.ERB` 命令默认叙述）—— 命令速查不够时来这查/grep** | `references/data/engine/`（见其 `README.md`） |
@@ -87,30 +87,30 @@ This skill ships with a `references/` directory of supplementary docs (full labe
 | **依赖系（IRAI 委托）：`@M_KOJO_IRAI` 标签、ROLE/SCENE 枚举、`依頼名` CASE 值、骨架、debug 触发法** | `references/15-依赖系.md` |
 | **刻印(MARK)系统：全表、不埒/反発刻印怎么获得(阈值)/消除/机械影响、`MARK:不埒刻印==n` 台词分层、`MARKCNG`+`TFLAG:24` 瞬时旁白、debug 增减** | `references/16-刻印系统.md` |
 
-**For chatbot mode**, when you need any of the above, tell the user verbatim: *"Please upload `references/<filename>` from the eraTW-skill repository, or paste its contents."* Always name the **specific file** — don't say "upload the data" generically.
+**对于聊天机器人模式**，当你需要上述任何一项时，逐字告诉用户：*「请从 eraTW-skill 仓库上传 `references/<filename>`，或粘贴其内容。」* 始终点明**具体文件** —— 不要笼统地说「上传数据」。
 
 > **扩充本 SKILL 的方法论（枚举 + 样例双驱动）。** 早期这套 references 是"样例驱动"的——研读若干现成口上、把见到的东西写下来；结果被样例用到的命令/helper 有成段讲解，没被用到的（如 403/415/416、`SHIRAHU` 的同房惯用法）要么只在某张表里留一格、要么散落在打包的原始 CSV 里没被消化，导致写作时检索不到。**扩充时务必同时"枚举驱动"**：把权威枚举表逐条过一遍再消化——`Train.csv` 每个命令、`COMMON.ERB` 每个 helper、各 `EVENT_MESSAGE_COM*.ERB` 的命令 state 语义——而不是只补样例里碰巧出现的那些。新沉淀的通用知识写进 `references/12-命令速查.md`（命令级 state）、`references/13-高频惯用法.md`（成句套路）、`references/data/engine/`（行为源文件）。**新增的 SKILL 内容一律用中文描述**，仅标签名/代码标识符/必要术语保留原文（整份 SKILL 汉化是后续单独工程）。
 
-### 0.5 If a user uploads existing kojo files
+### 0.5 如果用户上传现有口上文件
 
-The user may share their current kojo or other characters' kojo for reference. **Read for structure, not content.** Bodies that contain explicit prose: skim only enough to see surrounding control flow and file role. Quote at most 1-2 lines of dialogue when essential.
+用户可能会分享他们当前的口上或其他角色的口上作参考。**看结构，别看内容。** 含露骨正文的主体：只略读到足以看清周围控制流和文件职责即可。必要时最多引用 1-2 行对话。
 
-**Reference priority order** when figuring out "how should this be structured":
+**参考优先级顺序**（在琢磨「这该怎么组织结构」时）：
 
-1. **The user's own kojo (their fork, previous attempt, or a sibling-character peer they uploaded)** — primary. Their fork's conventions, their author-private CFLAG ranges, the persona register they want to match. Skip reading anything in `reference-kojo/` by default if the user has provided their own structurally-similar files.
-2. **`reference-kojo/口上テンプレ/`** (the official empty template) — secondary. This is the canonical structural skeleton + the doc-banner comments that ARE the spec for each label's `ARG` / `ARG:1` / return-contract. Skim `M_KOJO_KX_イベント.ERB` once at the start of a scaffolding session.
-3. **`reference-kojo/reimu/`** (filled-in worked example) — tertiary. Only when you need to see *how* an empty stub gets filled in (e.g. what does the 恋慕 branch of `MESSAGE_COM_K1_311` look like with real prose? what's a real `EVENT_K1_GRAVITY` body?). Grep the specific section rather than reading whole files.
+1. **用户自己的口上（他们的 fork、之前的尝试，或他们上传的同类姊妹角色）** —— 首选。他们 fork 的约定、他们作者私有的 CFLAG 区段、他们想匹配的人格语域。如果用户已提供了结构相似的自有文件，默认跳过阅读 `reference-kojo/` 里的任何内容。
+2. **`reference-kojo/口上テンプレ/`**（官方空模板）—— 次选。这是权威的结构骨架 + 那些*即是每个标签的 `ARG` / `ARG:1` / 返回契约规范*的文档横幅注释。搭建会话开始时略读一次 `M_KOJO_KX_イベント.ERB`。
+3. **`reference-kojo/reimu/`**（填好的实战范例）—— 第三选。仅当你需要看空存根*如何*被填充时（例如 `MESSAGE_COM_K1_311` 的 恋慕 分支填上真实正文长什么样？真实的 `EVENT_K1_GRAVITY` 主体长什么样？）。grep 具体小节，而不是通读整个文件。
 
-Mention which reference you're consulting when you do, so the user knows where the pattern came from.
+当你查阅某个参考时说明一下，好让用户知道这套写法从哪来。
 
-### 0.6 `[SKIPSTART]/[SKIPEND]` — two legitimate uses you'll see in existing kojo
+### 0.6 `[SKIPSTART]/[SKIPEND]` —— 你会在现有口上里看到的两种正当用途
 
-The Emuera parser skips everything between `[SKIPSTART]` and `[SKIPEND]` lines (each on its own line, square brackets included). Existing kojo (Reimu K1, Lunasa K22, Eiki K30, etc.) use this for two distinct purposes — both are valid:
+Emuera 解析器会跳过 `[SKIPSTART]` 和 `[SKIPEND]` 行之间的一切（每个各占一行，含方括号）。现有口上（灵梦 K1、露娜萨 K22、映姬 K30 等）用它来达成两种不同目的 —— 两者都合法：
 
-1. **Dev-time multi-line comment / temporary disable.** Wrap a block you're not ready to ship — half-finished prose, an experimental cascade, an idea you might come back to. The block stays in the file (versionable, easy to re-enable by deleting two lines) but the engine doesn't compile it. This is the most common usage.
-2. **Optional new-API features.** Wrap any `@KOJO_CUSTOM_BUTTON_*` / `@KOJO_CUSTOM_TALENT_*` block when you're not sure the user's engine version supports it; the file then loads cleanly on older engines too.
+1. **开发期多行注释 / 临时禁用。** 把一段你还没准备好上线的内容包起来 —— 写了一半的正文、一个实验性的连锁、一个你可能回头再改的想法。这段留在文件里（可版本化，删掉两行就能轻松重新启用），但引擎不会编译它。这是最常见的用法。
+2. **可选的新 API 特性。** 当你不确定用户的引擎版本是否支持时，把任何 `@KOJO_CUSTOM_BUTTON_*` / `@KOJO_CUSTOM_TALENT_*` 块包起来；这样文件在旧引擎上也能干净加载。
 
-**When you write new code**: prefer `;`-prefixed line comments for short notes; reach for `[SKIPSTART]/[SKIPEND]` only when you genuinely want a multi-line block that's parseable but disabled. **When you read existing code**: don't assume a SKIPSTART block is "dead code to delete" — the author may be intentionally parking work-in-progress there.
+**当你写新代码时**：短注释优先用 `;` 开头的行注释；只有当你真的想要一个「可解析但被禁用」的多行块时才动用 `[SKIPSTART]/[SKIPEND]`。**当你读现有代码时**：别假定一个 SKIPSTART 块是「该删的死代码」—— 作者可能是有意把进行中的工作停放在那里。
 
 ### 0.7 ⛔ 作业边界：写操作【只能】落在口上文件夹里
 
@@ -162,22 +162,22 @@ The Emuera parser skips everything between `[SKIPSTART]` and `[SKIPEND]` lines (
 
 ---
 
-## 1. Most-common first-pass mistakes — read every time
+## 1. 最常见的初稿错误 —— 每次都读
 
-These are the bugs we see in nearly every first-pass kojo generation. Hold them in your head while writing. Each one is detailed in the relevant section/reference below.
+这些是我们在几乎每一次口上初稿生成里都能看到的 bug。写作时把它们记在脑子里。每一条都在下面相关的小节/参考里详述。
 
-1. **Custom-named function parameters need a `#DIM` declaration in the body.** Emuera's parser only auto-recognizes positional `ARG / ARG:N / ARGS / ARGS:N`. Any other identifier in the header — `TYPE`, `相手残機`, `OPTION`, `PAGENUM`, `MODE`, `PAGECOUNT` — raises a Lv2 warning and reads return zero unless the body declares the variable with `#DIM <name>` (numeric) or `#DIMS <name>` (string) immediately after the `@` line. **Two acceptable shapes:** ① rename to positional: `@FOO(ARG, ARG:1 = 0)` then optionally `TYPE = ARG:1` as an alias; ② keep the engine-required custom names (e.g. `@DIARY_TEXT_K{id}, PAGENUM, MODE, PAGECOUNT`) and declare them with `#DIM PAGENUM / #DIMS MODE / #DIM PAGECOUNT` on the first three body lines. The engine-callable labels that *require* shape ② are flagged in `references/01-engine-label-catalog.md` §2.4 — chiefly `@DIARY_TEXT_K{id}`. → §7 / `references/04-dsl-full.md`
-2. **`[[X]]` silently compiles to `0` when X is not in `Str.csv`.** Most character names — `[[アリス]]`, `[[ルナサ]]`, `[[メルラン]]`, `[[幽々子]]`, `[[ライコ]]`, etc. — are NOT in `Str.csv`, so `CASE [[ルナサ]]` becomes `CASE 0` and matches ARG=0 by accident. **Default to numeric IDs with comments**: `CASE 22  ;ルナサ`. Reserve `[[X]]` for names you've grep-confirmed in `Str.csv`.
-3. **`MASTER`, `TARGET`, `PLAYER`, `ASSI` are bare identifiers, not `[[MASTER]]`.** Writing `[[MASTER]]` produces a warning.
-4. **`@M_KOJO_EVENT_K{id}_1(ARG, ARG:1)` fires once PER CELL TRANSITION** the character makes anywhere on MASTER's current world map, not "once when entering MASTER's room." A char walking bedroom→corridor→dining will print 3 dialogue lines while MASTER is still asleep. **Mandatory first guard:** `SIF CFLAG:{id}:現在位置 != CFLAG:MASTER:現在位置 / RETURN 0`. Then branch on ARG sub-phase (1=MASTER walks in, 2=char walks in, 3-5=bath sub-phases). Same applies to `_2` (morning) and `_3` (sleep). → `references/05-event-arg-subphases.md`
-5. **`@M_KOJO_EVENT_K{id}_GRAVITY` is a SILENT NPC-AI movement attractor**, not a "gravity event." It fires every NPC-movement-decision tick (many per turn). Body must set `TCVAR:{id}:引力点 = <location-code>` and **must not call any `PRINT*`**. → `references/01-engine-label-catalog.md`
-6. **`@M_KOJO_MESSAGE_COM_K{id}_00` fires on EVERY undefined cmd**, not "rarely." Default to `LOCAL = 0 / RETURN 0` (silent) unless you specifically want one identical line on every undefined cmd.
-7. **`@M_KOJO_MESSAGE_MARKCNG_K{id}` fires after every action that *could* affect a mark**, not only on transitions. Body must guard `SIF !TFLAG:21 && !TFLAG:22 && !TFLAG:23 && !TFLAG:24 && !TFLAG:時姦刻印取得 / RETURN 0` before printing.
-8. **`CFLAG:N:约会中` is a MAIN_MAP code, not a boolean.** After any first date, the slot is permanently non-zero. `IF CFLAG:N:约会中` is always-true thereafter. Canonical predicate for "currently dating with this character": `CHK_DATENOW(CFLAG:MASTER:约会中) && FLAG:约会的对象 == TARGET`.
-9. **Slot names must match the actual CSV byte-for-byte.** This fork uses simplified-Chinese in many CFLAG names (`约会中`, `历史` etc.) — Japanese-kanji forms like `約会中` *do not resolve*. Some slot names that "look canonical" don't exist in this fork's CSVs (e.g. `BASE:N:疲労` doesn't exist; use `BASE:N:気力 < MAXBASE/2` for "tired". `TFLAG:逢瀬時間` doesn't exist; track with a private CFLAG instead).
-10. **Files must be UTF-8 with BOM**, ideally CRLF. Without BOM, Chinese characters in some string contexts silently break. Write tools default to LF/no-BOM; prepend BOM after every write/edit. → `references/10-encoding-and-tools.md`
-11. **Display name in `CSV/Chara/Chara<N> *.csv` must match what your kojo prose calls the character.** The engine prints `%CALLNAME:N%` from CSV — if your prose calls her "莉莉卡" but the CSV says "莉莉喀", the player sees both inconsistently. Check `名前` and `呼び名` rows before authoring; edit CSV if you want a different display name.
-12. **An early-return `IF` branch suppresses everything below it.** Bodies that gate broad conditions (room class, weather, time-of-day) at the top of a cascade will block all the rich relationship content for most of the game. RAND-gate broad conditions, or move them inside relationship branches as flavor sub-conditions, instead of as early-return blockers.
+1. **自定义命名的函数参数需要在主体里有 `#DIM` 声明。** Emuera 的解析器只自动识别位置参数 `ARG / ARG:N / ARGS / ARGS:N`。头部里任何其他标识符 —— `TYPE`、`相手残機`、`OPTION`、`PAGENUM`、`MODE`、`PAGECOUNT` —— 会触发 Lv2 警告，且读取返回零，除非主体在 `@` 行紧后用 `#DIM <name>`（数值）或 `#DIMS <name>`（字符串）声明该变量。**两种可接受的形态：** ① 改名为位置参数：`@FOO(ARG, ARG:1 = 0)`，然后可选地 `TYPE = ARG:1` 作为别名；② 保留引擎所需的自定义名（例如 `@DIARY_TEXT_K{id}, PAGENUM, MODE, PAGECOUNT`），并在主体头三行用 `#DIM PAGENUM / #DIMS MODE / #DIM PAGECOUNT` 声明它们。*要求*形态 ② 的引擎可调用标签在 `references/01-engine-label-catalog.md` §2.4 里被标注 —— 主要是 `@DIARY_TEXT_K{id}`。→ §7 / `references/04-dsl-full.md`
+2. **当 X 不在 `Str.csv` 里时，`[[X]]` 会静默编译成 `0`。** 大多数角色名 —— `[[アリス]]`、`[[ルナサ]]`、`[[メルラン]]`、`[[幽々子]]`、`[[ライコ]]` 等 —— 都*不*在 `Str.csv` 里，因此 `CASE [[ルナサ]]` 会变成 `CASE 0` 并意外匹配 ARG=0。**默认用带注释的数值 ID**：`CASE 22  ;ルナサ`。只把 `[[X]]` 留给你已 grep 确认在 `Str.csv` 里的名字。
+3. **`MASTER`、`TARGET`、`PLAYER`、`ASSI` 是裸标识符，不是 `[[MASTER]]`。** 写 `[[MASTER]]` 会产生一个警告。
+4. **`@M_KOJO_EVENT_K{id}_1(ARG, ARG:1)` 会在角色于 MASTER 当前世界地图上的任意处每发生一次「格子迁移」时触发一次**，而不是「进入 MASTER 房间时触发一次」。一个角色走 卧室→走廊→餐厅 会打印 3 行对话，而 MASTER 还在睡觉。**强制的第一道守卫：** `SIF CFLAG:{id}:現在位置 != CFLAG:MASTER:現在位置 / RETURN 0`。然后按 ARG 子阶段分支（1=MASTER 走进来，2=角色走进来，3-5=洗澡子阶段）。同理适用于 `_2`（早晨）和 `_3`（睡眠）。→ `references/05-event-arg-subphases.md`
+5. **`@M_KOJO_EVENT_K{id}_GRAVITY` 是一个静默的 NPC-AI 移动吸引子**，不是「重力事件」。它在每次 NPC 移动决策 tick（每回合很多次）都会触发。主体必须设置 `TCVAR:{id}:引力点 = <location-code>`，且**绝不能调用任何 `PRINT*`**。→ `references/01-engine-label-catalog.md`
+6. **`@M_KOJO_MESSAGE_COM_K{id}_00` 会在每一个未定义命令上触发**，而不是「很少触发」。默认设为 `LOCAL = 0 / RETURN 0`（静默），除非你特意想在每个未定义命令上都来同一行台词。
+7. **`@M_KOJO_MESSAGE_MARKCNG_K{id}` 会在每一个*可能*影响刻印的动作之后触发**，不只在发生变化时。主体在打印前必须守卫 `SIF !TFLAG:21 && !TFLAG:22 && !TFLAG:23 && !TFLAG:24 && !TFLAG:時姦刻印取得 / RETURN 0`。
+8. **`CFLAG:N:约会中` 是一个 MAIN_MAP 编码，不是布尔值。** 任何一次首次约会之后，该槽位就永久非零了。`IF CFLAG:N:约会中` 此后恒为真。「当前正与该角色约会中」的权威谓词是：`CHK_DATENOW(CFLAG:MASTER:约会中) && FLAG:约会的对象 == TARGET`。
+9. **槽位名必须与实际 CSV 逐字节匹配。** 本 fork 在许多 CFLAG 名里用了简体中文（`约会中`、`历史` 等）—— 日文汉字形式如 `約会中` *无法解析*。有些「看起来很权威」的槽位名在本 fork 的 CSV 里并不存在（例如 `BASE:N:疲労` 不存在；「疲惫」用 `BASE:N:気力 < MAXBASE/2`。`TFLAG:逢瀬時間` 不存在；改用一个私有 CFLAG 跟踪）。
+10. **文件必须是带 BOM 的 UTF-8**，最好 CRLF。没有 BOM，中文字符在某些字符串上下文里会静默出错。写入工具默认 LF/无 BOM；每次写入/编辑后补上 BOM。→ `references/10-encoding-and-tools.md`
+11. **`CSV/Chara/Chara<N> *.csv` 里的显示名必须与你口上正文对该角色的称呼一致。** 引擎从 CSV 打印 `%CALLNAME:N%` —— 如果你的正文叫她「莉莉卡」而 CSV 写「莉莉喀」，玩家会看到两者不一致地混用。创作前检查 `名前` 和 `呼び名` 行；若想要不同的显示名就编辑 CSV。
+12. **一个提前返回的 `IF` 分支会压制它下面的一切。** 在连锁顶部对宽泛条件（房间类别、天气、时段）设门的主体，会在游戏的大部分时间里挡住所有丰富的关系内容。对宽泛条件用 RAND 设门，或把它们作为调味的子条件移进关系分支内部，而不是作为提前返回的拦截器。
 13. **写任何命令处理体前，先查该命令能读哪些 state —— 别凭记忆猜变量名。** 顺序（拉取变推送）：
     1. **先查 `references/12-命令速查.md` 里该命令那一节**，拿到它的口上标签、`TFLAG:193` 成败、以及命令专属状态变量（如演奏 416 的 `TFLAG:使用楽器`、劝酒 332 的 `BASE:酒気`、午睡 417 的 `CFLAG:陪睡中`）及各取值含义。
     2. **速查里没有 / 资料不足**：`grep "^{号}," references/data/Train.csv` 确认命令名 → grep 现存口上里该命令顶部的 banner 注释（`grep -rn "_COM_K.*_{号}" 個人口上/` 看多个作者的 banner，去重收敛）→ grep 引擎命令语义（`references/data/engine/EVENT_MESSAGE_COM{3,4}00.ERB`，或游戏里 `ERB\コマンド関連\COMF\COMF{号}*.ERB` 的命令主体）。
@@ -185,12 +185,12 @@ These are the bugs we see in nearly every first-pass kojo generation. Hold them 
 
 ---
 
-## 2. Verification pass — run before declaring done
+## 2. 校验流程 —— 宣布完成前先跑
 
-After scaffolding a new kojo, before handing back to the user, verify:
+搭好一个新口上后、交回给用户前，校验：
 
 ```bash
-# Adjust paths to match the user's install
+# 按用户的安装路径调整
 DIR="<kojo variant dir, e.g. ERB/口上・メッセージ関連/個人口上/100 Rei'sen [レイセン]/myvar>"
 CSVDIR="<game root>/CSV"
 
@@ -254,30 +254,30 @@ echo "=== RAND:0 (would crash at runtime) ==="
 grep -nE "RAND:0\b" *.ERB
 ```
 
-If any check fails, fix and re-run. **Re-run after every Edit pass** because tools sometimes strip BOM on rewrite.
+若有任何检查失败，修复后重跑。**每一遍 Edit 后都重跑**，因为工具有时会在重写时剥掉 BOM。
 
 ---
 
-## 3. Debugging with the user
+## 3. 与用户一起调试
 
-The verification pass (§2) catches static issues. But many bugs only show at runtime — a line that prints too many times, a predicate that doesn't fire, a CFLAG slot that's silently the wrong type. This section is the **iteration loop** you run *with the user* whenever something doesn't behave right after a kojo edit.
+校验流程（§2）能抓到静态问题。但很多 bug 只在运行时才暴露 —— 某行打印太多次、某个谓词不触发、某个 CFLAG 槽位静默地是错误类型。本节是**迭代循环**，当口上改完后行为不对时，你*与用户一起*运行它。
 
-### 3.1 How to get the game's log out
+### 3.1 如何把游戏日志导出来
 
-The game has two relevant menu actions under **「文件」** (File menu):
+游戏在 **「文件」** 菜单下有两个相关动作：
 
-- **「保存日志」** — saves the current session log to a file in the game directory.
-- **「将日志复制到剪切板」** — copies the session log to clipboard, ready for the user to paste into chat.
+- **「保存日志」** —— 把当前会话日志保存为游戏目录里的一个文件。
+- **「将日志复制到剪切板」** —— 把会话日志复制到剪贴板，方便用户粘贴进聊天。
 
-**The user pastes the relevant log section into the conversation; you read it.** Ask users to paste only the relevant section, since the entire log can be long and contain lots of irrelevant content.
+**用户把相关日志片段粘进对话；你来读。** 让用户只粘相关片段，因为整份日志可能很长，含大量无关内容。
 
-In addition, the game writes `emuera.log` and `<YYYYMMDD-HHMMSS>.log` (per-session) files in the game root directory. But the former may not be lively updated. The latter is generated by **「保存日志」**.
+此外，游戏会在游戏根目录写入 `emuera.log` 和 `<YYYYMMDD-HHMMSS>.log`（每会话一份）。但前者可能不会实时更新。后者由 **「保存日志」** 生成。
 
-### 3.2 Compilation errors — must be fixed before anything else
+### 3.2 编译错误 —— 必须先修好，其他一切之前
 
-Compilation errors don't prevent the game from loading, but they may crash the game anytime. They appear at game launch.
+编译错误不会阻止游戏加载，但它们可能随时让游戏崩溃。它们在游戏启动时出现。
 
-**A healthy launch shows roughly four lines:**
+**一次健康的启动大约显示四行：**
 
 ```
 如果出現了錯誤、請根據目錄下的報錯指導文件進行報錯
@@ -286,7 +286,7 @@ Loading complete. Took 2.19 seconds.
 Press Enter or click to proceed.
 ```
 
-**Lines between the second and third are likely compilation errors.** Example:
+**第二行与第三行之间的行很可能是编译错误。** 例：
 
 ```
 如果出現了錯誤、請根據目錄下的報錯指導文件進行報錯
@@ -299,47 +299,47 @@ Loading complete. Took 2.19 seconds.
 Press Enter or click to proceed.
 ```
 
-Each `警告Lv2:` line tells you:
-- **File path** (relative to game root, e.g. `口上・メッセージ関連\個人口上\020 Lyrica [リリカ]\リリカ\M_KOJO_K20_日記.ERB`).
-- **Line number** (e.g. `第40行` = line 40).
-- **Function name affected** (e.g. `@DIARY_TEXT_K20`).
-- **The actual cause** (e.g. `参数错误:变量"PAGENUM"未在此函数中定义` — "param error: variable PAGENUM not defined in this function" — see pitfall #1: custom param names don't work; use `ARG/ARG:1/ARGS/ARGS:1`).
+每一行 `警告Lv2:` 告诉你：
+- **文件路径**（相对游戏根目录，例如 `口上・メッセージ関連\個人口上\020 Lyrica [リリカ]\リリカ\M_KOJO_K20_日記.ERB`）。
+- **行号**（例如 `第40行` = 第 40 行）。
+- **受影响的函数名**（例如 `@DIARY_TEXT_K20`）。
+- **实际原因**（例如 `参数错误:变量"PAGENUM"未在此函数中定义` —— 「参数错误：变量 PAGENUM 未在此函数中定义」—— 见坑 #1：自定义参数名不生效；用 `ARG/ARG:1/ARGS/ARGS:1`）。
 
-**Workflow when the user pastes a compile error:**
+**当用户粘贴一个编译错误时的工作流：**
 
-1. Tell the user: **«请把游戏启动时出现的所有 `警告Lv2:` 行都贴给我。** A healthy launch only shows the first 2 and last 2 lines you saw — anything between is an error that needs fixing.»
-2. Map each warning to a §1 pitfall (most warnings match one of the 12 listed there) or to the §2 verification-pass checks.
-3. Patch the file. Show a diff.
-4. **Confirm with the user**: «请重新启动游戏，看看 `警告Lv2:` 行有没有消失。» Repeat until clean.
+1. 告诉用户：**«请把游戏启动时出现的所有 `警告Lv2:` 行都贴给我。** 一次健康的启动只显示你看到的前 2 行和后 2 行 —— 中间的任何内容都是需要修复的错误。»
+2. 把每个警告映射到某条 §1 坑（大多数警告都能对上那里列的 12 条之一）或映射到 §2 的校验检查。
+3. 修补文件。展示一个 diff。
+4. **与用户确认**：«请重新启动游戏，看看 `警告Lv2:` 行有没有消失。» 重复直到干净。
 
-**Don't move on to runtime testing until startup is clean.** A game with compile errors at launch may *appear* to run but the affected labels will be silently broken.
+**在启动干净之前，别进入运行时测试。** 一个启动时带编译错误的游戏可能*看起来*能跑，但受影响的标签会静默失效。
 
-**⚠️ Newly-added label does nothing in-game, but there's NO compile error? Suspect `lazyloading.dat` FIRST — before touching the code.** With `USELAZYLOADING:YES` (player default), a **brand-new** label you just added is not in the stale symbol cache, so the engine acts as if it doesn't exist and falls through to generic narration (you see the command's default banner but none of your kojo lines). Body edits to *existing* labels usually DO show — that asymmetry is the confusing part. Delete `lazyloading.dat` in the game root and relaunch (the engine rebuilds it). The autotest launcher does this automatically; a manual exe launch does not. Full detail: `references/11-autotest-pipeline.md` §11.6.
+**⚠️ 新加的标签在游戏里没反应，但*没有*编译错误？先怀疑 `lazyloading.dat` —— 在动代码之前。** 在 `USELAZYLOADING:YES`（玩家默认）下，你刚加的一个**全新**标签不在陈旧的符号缓存里，因此引擎会当它不存在，回退到通用叙述（你看到命令的默认横幅，但没有你的口上台词）。对*现有*标签的主体编辑通常*会*显示 —— 这种不对称正是令人困惑之处。删掉游戏根目录里的 `lazyloading.dat` 再重启（引擎会重建它）。autotest 启动器会自动做这件事；手动 exe 启动不会。完整细节：`references/11-autotest-pipeline.md` §11.6。
 
-### 3.3 Runtime issues — proactive debug-print workflow
+### 3.3 运行时问题 —— 主动的调试打印工作流
 
-After every non-trivial kojo edit, **proactively ask the user**:
+每次非平凡的口上编辑后，**主动询问用户**：
 
 > «改完了。请在游戏里测试一下：[列出受影响的 cmd / 事件 / 触发条件]。如果有任何不对的地方（例如台词重复、不该触发的时候触发、对话乱序等），请告诉我并贴出 `「文件」→「将日志复制到剪切板」` 的内容。»
 
-If the user reports an issue:
+若用户报告一个问题：
 
-1. **Identify which body label fired** (or should have fired but didn't). Read the user's description; map it to a label.
-2. **Add temporary debug-prints** to that body capturing the relevant state (recipe in §3.4 below).
-3. **Hand back to the user**: «我加了一些临时的诊断打印。请重新触发刚才的操作 (e.g. 走进莉莉卡的房间)，然后用 `「文件」→「将日志复制到剪切板」` 把日志贴给我。»
-4. **Diagnose from the captured state**. Common patterns:
-   - A predicate evaluated wrong because a CFLAG was non-boolean (see pitfall #8 — `约会中` is a map-id).
-   - A label fired more times than expected (see pitfall #4 — `EVENT_K_1` fires per cell transition).
-   - A slot was zero because `[[X]]` failed to resolve (see pitfall #2).
-   - A function param was unreadable inside the body (see pitfall #1).
-5. **Patch and remove the debug-prints** in the same edit. Tell the user: «已修复。**注意我把诊断打印行删掉了**，这样以后正式玩的时候不会有 `[DBG]` 噪音。»
+1. **确定哪个主体标签触发了**（或本应触发却没触发）。读用户的描述；映射到一个标签。
+2. **加临时调试打印**到那个主体，捕捉相关 state（配方见下方 §3.4）。
+3. **交回给用户**：«我加了一些临时的诊断打印。请重新触发刚才的操作 (e.g. 走进莉莉卡的房间)，然后用 `「文件」→「将日志复制到剪切板」` 把日志贴给我。»
+4. **从捕捉到的 state 诊断**。常见模式：
+   - 某谓词求值错误，因为一个 CFLAG 非布尔（见坑 #8 —— `约会中` 是地图 id）。
+   - 某标签触发次数多于预期（见坑 #4 —— `EVENT_K_1` 每次格子迁移都触发）。
+   - 某槽位是零，因为 `[[X]]` 没解析成功（见坑 #2）。
+   - 某函数参数在主体内不可读（见坑 #1）。
+5. **在同一次编辑里修补并移除调试打印**。告诉用户：«已修复。**注意我把诊断打印行删掉了**，这样以后正式玩的时候不会有 `[DBG]` 噪音。»
 
-### 3.4 The debug-print recipe
+### 3.4 调试打印配方
 
-To inspect state at any point in a body, add lines like:
+要在主体的任意点检查 state，加入这样的行：
 
 ```erb
-;[DBG] — TEMPORARY; remove before declaring done
+;[DBG] — 临时；宣布完成前移除
 PRINTFORML [DBG] DAY={DAY:0} MAIN_MAP={MAIN_MAP} TIME:5={TIME:5} TIME:2={TIME:2}
 PRINTFORML [DBG] ARG={ARG} ARG:1={ARG:1} SELECTCOM={SELECTCOM} TFLAG:50={TFLAG:50}
 PRINTFORML [DBG] CFLAG:20:現在位置={CFLAG:20:現在位置} CFLAG:MASTER:現在位置={CFLAG:MASTER:現在位置}
@@ -347,12 +347,12 @@ PRINTFORML [DBG] CFLAG:20:约会中={CFLAG:20:约会中} FLAG:约会的对象={F
 PRINTFORML [DBG] TALENT:恋慕={TALENT:恋慕} TALENT:恋人={TALENT:恋人} ABL:20:親密={ABL:20:親密}
 ```
 
-Notes on the syntax:
+关于语法的说明：
 
-- **`{<expr>}` inside any `PRINTFORM*` command** evaluates and substitutes the expression's value at print time. Numbers print as digits; strings print as text.
-- **`PRINT VARDUMP(<arr>)`** dumps an entire array's contents.
-- **Always prefix with `[DBG]`** so the user can spot your debug lines amid normal narration. Searching for `[DBG]` in the pasted log gets just the diagnostic output.
-- **For predicates that branch silently** (return without printing), put a debug-print *inside each branch* with a unique tag so the log reveals which path was taken:
+- **任何 `PRINTFORM*` 命令里的 `{<expr>}`** 会在打印时求值并替换成该表达式的值。数字打印为数位；字符串打印为文本。
+- **`PRINT VARDUMP(<arr>)`** 会转储整个数组的内容。
+- **始终以 `[DBG]` 前缀** 好让用户能在正常叙述中认出你的调试行。在粘贴的日志里搜 `[DBG]` 就能只拿到诊断输出。
+- **对于静默分支的谓词**（不打印就返回），在*每个分支内部*放一个带唯一标记的调试打印，让日志揭示走了哪条路径：
   ```erb
   IF CHK_DATENOW(CFLAG:MASTER:约会中) && FLAG:约会的对象 == TARGET
       PRINTFORML [DBG-A] dating-with-this-char branch taken
@@ -365,197 +365,197 @@ Notes on the syntax:
       ...
   ENDIF
   ```
-- **Remove ALL debug lines** before declaring the kojo done. Grep for `[DBG]` in the file and delete each. The verification pass in §2 should catch any leftover.
+- **移除所有调试行** 再宣布口上完成。在文件里 grep `[DBG]` 并逐一删除。§2 的校验流程应能抓到任何残留。
 
-### 3.5 What the user's bug-report message looks like
+### 3.5 用户的 bug 报告消息长什么样
 
-You should expect (and gently shape) the user to say something like:
+你应该预期（并温和地引导）用户说出类似这样的话：
 
 > «我刚刚走进莉莉卡的房间，但她的台词出现了 3 次。日志如下: [paste]»
 
-Or after a compile error:
+或在一个编译错误之后：
 
 > «游戏启动时报错: [paste 警告Lv2: block]»
 
-Reply quickly with:
+快速回复：
 
-1. **Quote the relevant log line(s) back** so the user knows you read it.
-2. **State the cause in one sentence** ("这是 §1 pitfall #4 — `EVENT_K_1` 每次角色走进新格子都会触发，body 缺少同格守卫。").
-3. **Show the fix as a diff.**
-4. **Tell the user the next step**: «请重新启动游戏看看是否还有报错。» / «请再触发一次该动作并粘贴新的日志。»
+1. **把相关日志行引用回去** 让用户知道你读了它。
+2. **一句话说明原因**（"这是 §1 pitfall #4 — `EVENT_K_1` 每次角色走进新格子都会触发，body 缺少同格守卫。"）。
+3. **以 diff 展示修复。**
+4. **告诉用户下一步**：«请重新启动游戏看看是否还有报错。» / «请再触发一次该动作并粘贴新的日志。»
 
-Iteration cycles tend to be 30-60 seconds each (game restart + repro + paste). Stay terse — don't over-explain.
+迭代周期往往每次 30-60 秒（游戏重启 + 复现 + 粘贴）。保持简洁 —— 别过度解释。
 
 ---
 
-## 4. The big picture — what's where
+## 4. 全景图 —— 什么在哪
 
 ```
 eraTW/
-├── ERB/                                  ; ALL game logic (Emuera scripts)
+├── ERB/                                  ; 全部游戏逻辑（Emuera 脚本）
 │   ├── 口上・メッセージ関連/
-│   │   ├── KOJO_MESSAGE.ERB              ; the dispatcher (engine — never modify)
-│   │   ├── COMMON_KOJO.ERB               ; library helpers
-│   │   ├── EVENT_MESSAGE*.ERB            ; engine default narration
-│   │   └── 個人口上/                      ; YOUR DOMAIN: per-character kojo
+│   │   ├── KOJO_MESSAGE.ERB              ; 分发器（引擎 —— 永不修改）
+│   │   ├── COMMON_KOJO.ERB               ; 库 helper
+│   │   ├── EVENT_MESSAGE*.ERB            ; 引擎默认叙述
+│   │   └── 個人口上/                      ; 你的领域：按角色的口上
 │   │       ├── 001 Reimu [霊夢]/
 │   │       │   └── <variant>/
 │   │       │       ├── M_KOJO_K1_イベント.ERB
 │   │       │       ├── M_KOJO_K1_日常系コマンド.ERB
-│   │       │       └── … ~10-25 files
+│   │       │       └── … ~10-25 个文件
 │   │       ├── 002 Ruukoto [る～こと]/
-│   │       └── … 153 character dirs
-│   ├── COMMON.ERB, BATTLE.ERB            ; engine code
-│   ├── 天候*.ERB                          ; weather subsystem (a "system plugin" example)
-│   ├── コマンド関連/                      ; command system (COMF/, SCOMF/, COMABLE/)
-│   └── …                                 ; many other engine subdirs
-├── CSV/                                  ; static data tables
-│   ├── CFLAG.csv, TFLAG.csv, TCVAR.csv   ; flag slot dictionaries
-│   ├── Talent.csv, Abl.csv, Mark.csv     ; per-char trait dictionaries
-│   ├── Item.csv, Equip.csv, Train.csv    ; items / equipment / commands
-│   ├── Base.csv, Palam.csv               ; physiological base / parameters
-│   ├── Str.csv                           ; string table — gates [[X]] resolution
-│   └── Chara/                            ; per-character data CSVs (1 per char)
-├── 原版+前人整合等各种readme/             ; community tutorials & templates (see §12)
-│   ├── 改造とかしてみたい人のためのあれこれ/  ; modding tutorials (kojo tutorials, helper-fn ref, …)
-│   └── 資料/                               ; reference tables (CFLAG/TFLAG/TCVAR IDs, maps, …)
-├── Emuera*.exe                           ; engine binaries (multiple variants)
-├── emuera.config, README*                ; engine config
-└── sav/, dat/, resources/, font/         ; saves, sprites, fonts
+│   │       └── … 153 个角色目录
+│   ├── COMMON.ERB, BATTLE.ERB            ; 引擎代码
+│   ├── 天候*.ERB                          ; 天气子系统（一个「系统插件」示例）
+│   ├── コマンド関連/                      ; 命令系统（COMF/、SCOMF/、COMABLE/）
+│   └── …                                 ; 许多其他引擎子目录
+├── CSV/                                  ; 静态数据表
+│   ├── CFLAG.csv, TFLAG.csv, TCVAR.csv   ; 标志槽位字典
+│   ├── Talent.csv, Abl.csv, Mark.csv     ; 按角色的特性字典
+│   ├── Item.csv, Equip.csv, Train.csv    ; 物品 / 装备 / 命令
+│   ├── Base.csv, Palam.csv               ; 生理基础值 / 参数
+│   ├── Str.csv                           ; 字符串表 —— 决定 [[X]] 的解析
+│   └── Chara/                            ; 按角色的数据 CSV（每角色一份）
+├── 原版+前人整合等各种readme/             ; 社区教程与模板（见 §12）
+│   ├── 改造とかしてみたい人のためのあれこれ/  ; 改造教程（口上教程、helper 函数参考…）
+│   └── 資料/                               ; 参考表（CFLAG/TFLAG/TCVAR ID、地图…）
+├── Emuera*.exe                           ; 引擎二进制（多个变体）
+├── emuera.config, README*                ; 引擎配置
+└── sav/, dat/, resources/, font/         ; 存档、立绘、字体
 ```
 
-**Key insight**: there's no plugin manifest. The engine recursively scans `ERB/` at load time; *adding a new file is the entire installation*. Drop a variant directory into `個人口上/<id> <name>/` and you're done.
+**关键洞察**：没有插件清单。引擎在加载时递归扫描 `ERB/`；*加一个新文件就是全部安装过程*。把一个变体目录丢进 `個人口上/<id> <name>/`，就完成了。
 
-`原版+前人整合等各种readme/` is the original Japanese community's tutorial corpus — **most of the structural knowledge in this skill is sourced from there.** It's not loaded by the engine; it lives in the install for human reference. See §12 for what's in it and when to consult it directly.
+`原版+前人整合等各种readme/` 是原始日文社区的教程语料库 —— **本 skill 里的大部分结构性知识都源自那里。** 它不会被引擎加载；它存在于安装里供人参考。§12 说明里面有什么、何时直接查阅。
 
 ---
 
-## 5. Mental model — engine code vs kojo code
+## 5. 心智模型 —— 引擎代码 vs 口上代码
 
-There are two kinds of code in this game; keep them separated:
+本游戏里有两种代码；把它们分开：
 
-1. **Engine code** — `KOJO_MESSAGE.ERB`, `EVENT_MESSAGE*.ERB`, etc. **You never write or modify these.** They came with the game and implement the dispatch loop.
-2. **Kojo code** — files under `個人口上/<id> <name>/<variant>/M_KOJO_K<id>_*.ERB`. **This is what you write.** The engine reaches into these files looking for **specific label names** and calls whichever ones it finds.
+1. **引擎代码** —— `KOJO_MESSAGE.ERB`、`EVENT_MESSAGE*.ERB` 等。**你从不编写或修改这些。** 它们随游戏而来，实现了分发循环。
+2. **口上代码** —— `個人口上/<id> <name>/<variant>/M_KOJO_K<id>_*.ERB` 下的文件。**这才是你写的。** 引擎会伸进这些文件里寻找**特定的标签名**，并调用它找到的那些。
 
-The contract between the two is just a **list of label names**. The engine declares: *"if you define `@M_KOJO_MESSAGE_COM_K1_300`, I will call it whenever the player uses command 300 on character 1 (Reimu)."* You define the labels you care about; the engine ignores the rest.
+两者之间的契约仅仅是一份**标签名清单**。引擎声明：*「如果你定义了 `@M_KOJO_MESSAGE_COM_K1_300`，那么每当玩家对角色 1（灵梦）使用命令 300 时，我就会调用它。」* 你定义你关心的标签；引擎忽略其余的。
 
-So **as a kojo author you do not write `TRYCALLFORM ...`** — that line lives inside the engine and is not your concern. You only write `@LABEL_NAME` definitions. The engine reads the list of well-known label names and calls them. The full label catalog lives in `references/01-engine-label-catalog.md`.
+所以**作为口上作者你不写 `TRYCALLFORM ...`** —— 那行在引擎内部，不是你的事。你只写 `@LABEL_NAME` 定义。引擎读那份约定俗成的标签名清单并调用它们。完整标签目录在 `references/01-engine-label-catalog.md`。
 
-### 5.1 The dispatch flow, step-by-step
+### 5.1 分发流程，逐步
 
-Concrete walk-through of what happens when the player uses command 300 (会話) on character ID 1 (Reimu):
+当玩家对角色 ID 1（灵梦）使用命令 300（会話）时会发生什么，具体走一遍：
 
-1. The engine processes the player input and decides "this is a COMMAND on TARGET=1 with command-id=300".
-2. Engine calls its internal function `@KOJO_MESSAGE_SEND("COMMAND", 300, 1, ...)`.
-3. Inside that function (in `KOJO_MESSAGE.ERB`), the engine **constructs a label name from a template** and tries to call it:
+1. 引擎处理玩家输入，判定「这是一个对 TARGET=1、命令 id=300 的 COMMAND」。
+2. 引擎调用其内部函数 `@KOJO_MESSAGE_SEND("COMMAND", 300, 1, ...)`。
+3. 在那个函数内部（在 `KOJO_MESSAGE.ERB` 里），引擎**从一个模板构造出一个标签名**并尝试调用它：
    ```
    TRYCALLFORM M_KOJO%RESULTS%_MESSAGE_COM_K{NO:TARGET}_{ARG:1}
                        ↓                 ↓             ↓
-                       (selector,        K1            300       → label resolves to:
-                        usually empty)                            @M_KOJO_MESSAGE_COM_K1_300
+                       (选择器,          K1            300       → 标签解析为：
+                        通常为空)                                 @M_KOJO_MESSAGE_COM_K1_300
    ```
-   `TRYCALLFORM` is the engine's "try to call this label, but stay silent if it's not defined."
-4. If you defined `@M_KOJO_MESSAGE_COM_K1_300` in your kojo files, the engine runs your body. If not, the engine silently moves on to a fallback (the `_00` catch-all, then engine-default narration).
+   `TRYCALLFORM` 是引擎的「试着调用这个标签，但如果它没定义就保持静默」。
+4. 如果你在口上文件里定义了 `@M_KOJO_MESSAGE_COM_K1_300`，引擎就运行你的主体。如果没有，引擎静默地转向一个回退（`_00` 兜底，然后是引擎默认叙述）。
 
-That's the whole magic. The engine names labels using a few build-rules (one per dispatch kind); you provide the labels you want to populate.
+这就是全部的魔法。引擎用几条构建规则（每种分发类型一条）来命名标签；你提供你想填充的那些标签。
 
-### 5.2 What ARG, ARG:1, ARG:3 etc. mean (positional arguments)
+### 5.2 ARG、ARG:1、ARG:3 等是什么意思（位置参数）
 
-When the engine constructs a label name, some inputs go into the *name*; others get passed as **positional arguments to the body**:
+当引擎构造一个标签名时，一些输入进入*名字*；另一些作为**位置参数传给主体**：
 
 ```
 TRYCALLFORM M_KOJO_EVENT_K1_5(ARG:3, ARG:4)
                           ↓   ↓     ↓
-                          K=1 then ARG:3 and ARG:4 are passed as positional args
+                          K=1 然后 ARG:3 和 ARG:4 作为位置参数传入
                           event=5
 ```
 
-The engine has an `ARG`/`ARG:1`/`ARG:2`/... namespace internally. When constructing the label, it puts some into the *name string* (for label dispatch) and forwards the rest as positional arguments. **You don't define `ARG:3`/`ARG:4`; the engine fills them.** Your job is to **receive and read** them in your label header:
+引擎内部有一个 `ARG`/`ARG:1`/`ARG:2`/... 命名空间。构造标签时，它把一部分放进*名字字符串*（用于标签分发），把其余转发为位置参数。**你不定义 `ARG:3`/`ARG:4`；引擎来填。** 你的工作是在你的标签头里**接收并读取**它们：
 
 ```erb
 @M_KOJO_EVENT_K1_5(ARG, ARG:1)
 ;       ^                  ^
-;       Reimu              you receive ARG (engine's ARG:3) and ARG:1 (engine's ARG:4)
+;       灵梦               你接收 ARG（引擎的 ARG:3）和 ARG:1（引擎的 ARG:4）
 
-;Body — read ARG to decide which sub-state of event 5 we're in:
+;主体 —— 读 ARG 以判断我们处在 event 5 的哪个子状态：
 IF ARG == 0
-    PRINTFORML 「<line for ARG=0 — e.g. propose>」
+    PRINTFORML 「<ARG=0 的台词 —— 例如 求婚>」
 ELSEIF ARG == 1
-    PRINTFORML 「<line for ARG=1 — e.g. accept>」
+    PRINTFORML 「<ARG=1 的台词 —— 例如 接受>」
 ENDIF
 RETURN 1
 ```
 
-What each positional `ARG` means **depends on the dispatch kind**: for SPEVENT, `ARG` is usually a sub-state (0=propose, 1=accept, 2=reject); for EVENT, `ARG` is documented per-slot (see `references/05-event-arg-subphases.md`); for child-rearing `(ARGS, ARG, ARG:1)`, `ARGS` is the life-stage string. The full per-label arg semantics are in `references/01-engine-label-catalog.md`.
+每个位置 `ARG` 的含义**取决于分发类型**：对 SPEVENT，`ARG` 通常是一个子状态（0=求婚，1=接受，2=拒绝）；对 EVENT，`ARG` 按槽位有文档记载（见 `references/05-event-arg-subphases.md`）；对育儿 `(ARGS, ARG, ARG:1)`，`ARGS` 是人生阶段字符串。完整的按标签 arg 语义在 `references/01-engine-label-catalog.md`。
 
 ---
 
-## 6. Dispatch kinds — quick reference
+## 6. 分发类型 —— 快速参考
 
-The engine's `ARGS` keys (full label catalog → `references/01-engine-label-catalog.md`):
+引擎的 `ARGS` 键（完整标签目录 → `references/01-engine-label-catalog.md`）：
 
-| ARGS | When it fires | Label families it builds |
+| ARGS | 何时触发 | 它构建的标签族 |
 |---|---|---|
-| `"ENCOUNTER"` | First-meeting cutscene. | `@M_KOJO_ENCOUNTER_K{id}` |
-| `"SP_EVENT"` | One-shot scripted events (kiss, confession). | `@M_KOJO_SPEVENT_K{id}_{ev}(ARG, ARG:1)` |
-| `"EVENT"` | Generic events (room entry, morning, sleep). | `@M_KOJO_EVENT_K{id}_{ev}(ARG, ARG:1)` |
-| `"COMMAND"` | Player chose a command. | `@M_KOJO_MESSAGE_COM_K{id}_{cmd}` (+ `_SUCCESS_COM_*`, `_MESSAGE_SCOM_*`) |
-| `"COUNTER"` | Auto / idle reaction. | `@M_KOJO_MESSAGE_COUNTER_K{id}_{n}` |
-| `"PALAM"` | After-action stat-change (incl. orgasm). | `@M_KOJO_MESSAGE_PALAMCNG_A/A2/B/B2/F_K{id}` |
-| `"MARK"` | Mark / imprint acquired. | `@M_KOJO_MESSAGE_MARKCNG_K{id}` |
-| `"DANMAKU"` | Bullet-hell duel. | `@M_KOJO_MESSAGE_COM_K{id}_DANMAKU(ARGS, ARG)` |
-| `"IRAI"` | Quest dialogue. | `@M_KOJO_IRAI_K{id}(ROLE, SCENE, IRAI_ID)` |
-| `"DAILY"` | Daily event. | `@M_KOJO_DAILY_EVENT_K{id}_{n}(ARG..., ARGS:1, ARGS:2)` — known n: 2 (夢精), 4 (物思い), 12 (特訓) |
-| `"DIARY"` | Diary read. | `@DIARY_K{id}_*`, `@M_KOJO_MESSAGE_COM_K{id}_406` |
-| `"CHILD"` | Child-rearing event. | `@M_KOJO_EVENT_K{id}_CHILD_RAISING_*` |
-| `"GRAVITY"` | NPC AI movement decision (silent!). | `@M_KOJO_EVENT_K{id}_GRAVITY(ARG)` ← **silent**, sets `TCVAR:N:引力点`, never prints |
-| `"BEFORETRAIN"` | Pre-training silent hook. | `@K{id}_BEFORETRAIN` ← **silent** |
-| `"PERMISSION"` | Push-down consent (silent helper). | `@M_KOJO_EVENT_K{id}_PERMISSION_<n>(ARG)` |
-| `"LOST_VIRGIN_STOP"` | Virginity-loss interrupt (silent). | `@M_KOJO_EVENT_K{id}_LOST_VIRGIN_STOP(ARG)` |
-| `"GIFT"` | Gift received/given. | `@M_KOJO_EVENT_K{id}_GIFT(ARG, GIFT_ID, 評価点, GIFT_NAME, SENSE)` (5-arg, custom names — body needs `#DIM`/`#DIMS`) |
-| `"ONABARE"` | Caught-masturbating outburst. | `@M_KOJO_EVENT_K{id}_26(ARG, ARG:1)` (main dialogue) + `_26_1(ARGS)` (action pre-judgment) + optional `_ONABARE_1/2/3` (narration override) |
-| `"MUSHI_BATTLE"` | Bug-battle dialogue. | `@M_KOJO_MESSAGE_COM_K{id}_MUSHI_BATTLE(ARGS, ARG)` ← **writes `RESULTS = "..."`, NOT `PRINT*`** |
-| `"SUIKA"` | Watermelon-split directional callouts. | `@M_KOJO_MESSAGE_COM_K{id}_SUIKA(ARGS, ARG)` ← **writes `RESULTS = "..."`, NOT `PRINT*`** |
-| `"RUN_INTO"` | Random encounter on map. | `@RUN_INTO_K{id}(MAP_ID)` |
-| `"SEX_FRIEND"` | "Sex friend" contract scene. | `@KOJO_SF_CONTRACT_EVENT_K{id}(ARGS)` ("導入" / "補正" / "成功" / "失敗") |
-| `"IRAI_BLOCKED"` | Suppress specific quest from this char. | `@M_KOJO_CHECK_K{id}_IRAI_BLOCKED(ARGS, ARG, ARG:1)` ← returns 1 to block |
-| `"ODEKAKE"`, `"DIRECT"`, `"SUCCESS"`, `"ENDING"` | Misc / niche. | (see references/01) |
+| `"ENCOUNTER"` | 初次相遇过场。 | `@M_KOJO_ENCOUNTER_K{id}` |
+| `"SP_EVENT"` | 一次性脚本事件（接吻、告白）。 | `@M_KOJO_SPEVENT_K{id}_{ev}(ARG, ARG:1)` |
+| `"EVENT"` | 通用事件（进房、早晨、睡眠）。 | `@M_KOJO_EVENT_K{id}_{ev}(ARG, ARG:1)` |
+| `"COMMAND"` | 玩家选了一个命令。 | `@M_KOJO_MESSAGE_COM_K{id}_{cmd}`（+ `_SUCCESS_COM_*`、`_MESSAGE_SCOM_*`） |
+| `"COUNTER"` | 自动 / 空闲反应。 | `@M_KOJO_MESSAGE_COUNTER_K{id}_{n}` |
+| `"PALAM"` | 动作后的数值变化（含高潮）。 | `@M_KOJO_MESSAGE_PALAMCNG_A/A2/B/B2/F_K{id}` |
+| `"MARK"` | 刻印被获得。 | `@M_KOJO_MESSAGE_MARKCNG_K{id}` |
+| `"DANMAKU"` | 弹幕对决。 | `@M_KOJO_MESSAGE_COM_K{id}_DANMAKU(ARGS, ARG)` |
+| `"IRAI"` | 委托对话。 | `@M_KOJO_IRAI_K{id}(ROLE, SCENE, IRAI_ID)` |
+| `"DAILY"` | 日常事件。 | `@M_KOJO_DAILY_EVENT_K{id}_{n}(ARG..., ARGS:1, ARGS:2)` —— 已知 n：2 (夢精), 4 (物思い), 12 (特訓) |
+| `"DIARY"` | 日记阅读。 | `@DIARY_K{id}_*`、`@M_KOJO_MESSAGE_COM_K{id}_406` |
+| `"CHILD"` | 育儿事件。 | `@M_KOJO_EVENT_K{id}_CHILD_RAISING_*` |
+| `"GRAVITY"` | NPC AI 移动决策（静默！）。 | `@M_KOJO_EVENT_K{id}_GRAVITY(ARG)` ← **静默**，设 `TCVAR:N:引力点`，从不打印 |
+| `"BEFORETRAIN"` | 调教前静默钩子。 | `@K{id}_BEFORETRAIN` ← **静默** |
+| `"PERMISSION"` | 推送式同意（静默 helper）。 | `@M_KOJO_EVENT_K{id}_PERMISSION_<n>(ARG)` |
+| `"LOST_VIRGIN_STOP"` | 初次时的中断判定（静默）。 | `@M_KOJO_EVENT_K{id}_LOST_VIRGIN_STOP(ARG)` |
+| `"GIFT"` | 礼物 收到/送出。 | `@M_KOJO_EVENT_K{id}_GIFT(ARG, GIFT_ID, 評価点, GIFT_NAME, SENSE)`（5 参数，自定义名 —— 主体需 `#DIM`/`#DIMS`） |
+| `"ONABARE"` | 自慰被撞见时的爆发。 | `@M_KOJO_EVENT_K{id}_26(ARG, ARG:1)`（主对话）+ `_26_1(ARGS)`（动作前判定）+ 可选 `_ONABARE_1/2/3`（叙述覆盖） |
+| `"MUSHI_BATTLE"` | 虫战对话。 | `@M_KOJO_MESSAGE_COM_K{id}_MUSHI_BATTLE(ARGS, ARG)` ← **写 `RESULTS = "..."`，不是 `PRINT*`** |
+| `"SUIKA"` | 切西瓜方向提示。 | `@M_KOJO_MESSAGE_COM_K{id}_SUIKA(ARGS, ARG)` ← **写 `RESULTS = "..."`，不是 `PRINT*`** |
+| `"RUN_INTO"` | 地图上随机遭遇。 | `@RUN_INTO_K{id}(MAP_ID)` |
+| `"SEX_FRIEND"` | 「炮友」契约场景。 | `@KOJO_SF_CONTRACT_EVENT_K{id}(ARGS)`（"導入" / "補正" / "成功" / "失敗"） |
+| `"IRAI_BLOCKED"` | 抑制该角色的特定委托。 | `@M_KOJO_CHECK_K{id}_IRAI_BLOCKED(ARGS, ARG, ARG:1)` ← 返回 1 表示屏蔽 |
+| `"ODEKAKE"`, `"DIRECT"`, `"SUCCESS"`, `"ENDING"` | 杂项 / 小众。 | （见 references/01） |
 
-**Distinguishing print vs silent vs RESULTS-only dispatch is critical**:
-- **silent labels** (GRAVITY, BEFORETRAIN, PERMISSION, LOST_VIRGIN_STOP): putting `PRINTFORML` inside spams the player every tick → §1 pitfall #5
-- **RESULTS-only labels** (MUSHI_BATTLE, SUIKA): use `RESULTS = "<line>"` then `RETURN 1` — the engine prints it itself with auto-formatting. `PRINTFORML` here breaks the display. See `references/01-engine-label-catalog.md` §2.4.3.
+**区分 print / 静默 / 仅-RESULTS 分发至关重要**：
+- **静默标签**（GRAVITY, BEFORETRAIN, PERMISSION, LOST_VIRGIN_STOP）：在里面放 `PRINTFORML` 会每个 tick 都刷屏 → §1 坑 #5
+- **仅-RESULTS 标签**（MUSHI_BATTLE, SUIKA）：用 `RESULTS = "<line>"` 然后 `RETURN 1` —— 引擎会自己带自动格式打印它。此处用 `PRINTFORML` 会破坏显示。见 `references/01-engine-label-catalog.md` §2.4.3。
 
 ---
 
-## 7. Standard body shape (the most-reused template)
+## 7. 标准主体形态（最常复用的模板）
 
-Every command body follows this pattern. Use it as your default scaffold. The 10-tier cascade shown below is the *maximal* form; the official empty template (`reference-kojo/口上テンプレ/`) uses a simpler 4-tier cascade — see §9 for when each fits.
+每个命令主体都遵循这个模式。把它当作你的默认脚手架。下面展示的 10 层连锁是*最大*形态；官方空模板（`reference-kojo/口上テンプレ/`）用的是更简单的 4 层连锁 —— 见 §9 说明各自适用于何时。
 
 ```erb
 ;==================================================
-;<cmd-id>,<command-name>
-;TFLAG:193(1=mood-up 0=neutral -1=mood-down)
-;CFLAG:诶嘿嘿==2&&TCVAR:20(<situational sub-state>)
-;PREVCOM(<previous-cmd-numbers that affect this>)
+;<cmd-id>,<命令名>
+;TFLAG:193(1=心情上升 0=中立 -1=心情下降)
+;CFLAG:诶嘿嘿==2&&TCVAR:20(<情境子状态>)
+;PREVCOM(<影响本命令的前一命令号>)
 ;==================================================
 @M_KOJO_SUCCESS_COM_K<id>_<cmd>
 ;成否判定
-TFLAG:192 = 0                         ; -2 end, -1 fail, 0 default, 1 great-success
+TFLAG:192 = 0                         ; -2 结束, -1 失败, 0 默认, 1 大成功
 
 @M_KOJO_MESSAGE_COM_K<id>_<cmd>
-CALL TRAIN_MESSAGE                    ; engine default narration (omit if you want full custom)
-CALL M_KOJO_MESSAGE_COM_K<id>_<cmd>_1  ; dispatch to body
+CALL TRAIN_MESSAGE                    ; 引擎默认叙述（若想完全自定义则省略）
+CALL M_KOJO_MESSAGE_COM_K<id>_<cmd>_1  ; 分发到主体
 RETURN RESULT
 
 @M_KOJO_MESSAGE_COM_K<id>_<cmd>_1
 ;-------------------------------------------------
-;記入チェック（=0, 非表示、1, 表示）
-LOCAL = 1                              ; 1 = filled in, 0 = stub-skip
+;填写检查（=0, 不显示、1, 显示）
+LOCAL = 1                              ; 1 = 已填写, 0 = 存根跳过
 ;-------------------------------------------------
 IF LOCAL
-    IF FLAG:時間停止                   ; time-stop: silent unless 時間停止口上有 set
-    ELSEIF CFLAG:睡眠                  ; sleeping: silent unless 眠姦口上有 set
-    ELSEIF TALENT:恋人                 ; tier 5 — partner
+    IF FLAG:時間停止                   ; 時間停止：除非设了 時間停止口上有 否则静默
+    ELSEIF CFLAG:睡眠                  ; 睡眠中：除非设了 眠姦口上有 否则静默
+    ELSEIF TALENT:恋人                 ; 第 5 层 —— 伴侣
         SELECTCASE RAND:3
             CASE 1
                 PRINTFORML 「<lover-line-A>」
@@ -567,37 +567,37 @@ IF LOCAL
                 PRINTFORML 「<lover-line-C>」
                 PRINTFORMW <lover-narr-C>
         ENDSELECT
-    ELSEIF TALENT:愛欲 || TALENT:炮友  ; tier 4 — lust
+    ELSEIF TALENT:愛欲 || TALENT:炮友  ; 第 4 层 —— 情欲
         ...
-    ELSEIF TALENT:恋慕                 ; tier 3 — in love
+    ELSEIF TALENT:恋慕                 ; 第 3 层 —— 恋慕（陷入爱恋）
         ...
-    ELSEIF TALENT:思慕                 ; tier 2 — admiring
+    ELSEIF TALENT:思慕                 ; 第 2 层 —— 思慕（爱慕）
         ...
-    ELSE                                ; tier 1/0 — neutral or hostile
+    ELSE                                ; 第 1/0 层 —— 中立或敌对
         ...
     ENDIF
 ENDIF
 RETURN 1
 ```
 
-Contract points to remember:
+要记住的契约要点：
 
-- Always emit both `@M_KOJO_SUCCESS_COM_K<id>_<cmd>` and `@M_KOJO_MESSAGE_COM_K<id>_<cmd>` for any command this character handles. SUCCESS can be a single-line `TFLAG:192 = 0`.
-- The split `MESSAGE_COM_<cmd> → MESSAGE_COM_<cmd>_1` is convention; lets the body label be re-CALLed independently.
-- `RETURN 1` from the body marks "I handled it"; engine does not fall through to defaults.
-- `RETURN 0` or no return: engine falls through to `_00` catch-all then to engine defaults.
-- Last `PRINTFORML` of a body should usually be `PRINTFORMW` so the player advances.
-- Use `%CALLNAME:MASTER%`, not "你"/"主人公"/etc. — names are user-configurable.
-- For random variation: `SELECTCASE RAND:N / CASE 0 / … / CASEELSE` (default = highest-probability).
-- For single-line random: use `%TEXTR("a/b/c")%` inside a `PRINTFORML`.
+- 对本角色处理的任何命令，始终同时输出 `@M_KOJO_SUCCESS_COM_K<id>_<cmd>` 和 `@M_KOJO_MESSAGE_COM_K<id>_<cmd>`。SUCCESS 可以是单行 `TFLAG:192 = 0`。
+- 拆分 `MESSAGE_COM_<cmd> → MESSAGE_COM_<cmd>_1` 是约定；让主体标签能被独立地重新 CALL。
+- 主体的 `RETURN 1` 标记「我处理了」；引擎不会回退到默认。
+- `RETURN 0` 或不返回：引擎回退到 `_00` 兜底，然后回退到引擎默认。
+- 主体最后一个 `PRINTFORML` 通常应是 `PRINTFORMW`，好让玩家推进。
+- 用 `%CALLNAME:MASTER%`，而非 "你"/"主人公"/等 —— 名字是用户可配置的。
+- 随机变化：`SELECTCASE RAND:N / CASE 0 / … / CASEELSE`（默认 = 概率最高）。
+- 单行随机：在 `PRINTFORML` 里用 `%TEXTR("a/b/c")%`。
 
 ---
 
-## 8. The `LOCAL = 0/1` "filled-in" idiom
+## 8. `LOCAL = 0/1` 「填写与否」惯用法
 
-Bodies open with `LOCAL = 1` (filled) or `LOCAL = 0` (stub). `LOCAL = 0` causes the body to fall through silently. **Do not "fix" `LOCAL = 0` bodies** — they are intentional stubs.
+主体以 `LOCAL = 1`（已填）或 `LOCAL = 0`（存根）开头。`LOCAL = 0` 会让主体静默地回退穿过。**不要「修好」`LOCAL = 0` 的主体** —— 它们是有意的存根。
 
-Sub-branches use `LOCAL:1 = 1/0` for sub-toggles:
+子分支用 `LOCAL:1 = 1/0` 作子开关：
 
 ```erb
 LOCAL = 1
@@ -607,7 +607,7 @@ IF LOCAL
     LOCAL:1 = 1
     ;-------------------------------------------------
     IF LOCAL:1 && FIRSTTIME(SELECTCOM)
-        ; first-time-only branch
+        ; 仅初次的分支
     ENDIF
     ;基本セット
     IF FLAG:70
@@ -620,67 +620,67 @@ ENDIF
 RETURN 1
 ```
 
-This lets an author selectively enable/disable parts.
+这让作者能选择性地启用/禁用各部分。
 
 ---
 
-## 9. The standard branching cascade
+## 9. 标准分支连锁
 
-Two cascades are common; pick the one that fits the character's complexity.
+两种连锁很常见；挑符合该角色复杂度的那个。
 
-### 9.1 Maximal (10-tier) cascade — for full-featured kojo with rich per-tier flavor
+### 9.1 最大（10 层）连锁 —— 用于功能齐全、每层调味丰富的口上
 
-| Order | Guard | Comment |
+| 次序 | 守卫 | 注释 |
 |---|---|---|
-| 1 | `IF FLAG:時間停止` (`= FLAG:70`) | Time-stop active; usually silent unless `CFLAG:N:時間停止口上有 = 1` is set in FLAGSETTING. |
-| 2 | `ELSEIF CFLAG:睡眠` | Sleeping; silent unless `CFLAG:N:眠姦口上有 = 1`. |
-| 3 | `ELSEIF FLAG:扮演` | Role-play; silent unless `CFLAG:N:扮演口上有 = 1`. Can branch on `CFLAG:(FLAG:扮演):出禁`. |
-| 4 | `ELSEIF CFLAG:318 == 1` | "Extreme silent treatment / unfriendly" — many characters have this. |
-| 5 | `ELSEIF CFLAG:诶嘿嘿 == 2` | "Drunken playful 'ehehe' mood" — branch further on `TCVAR:20` for sub-action. |
-| 6 | `ELSEIF TALENT:恋人` | Tier 5 — partner. |
-| 7 | `ELSEIF TALENT:愛欲 \|\| TALENT:炮友` | Tier 4 — lust without commitment. |
-| 8 | `ELSEIF TALENT:恋慕` | Tier 3 — in love. |
-| 9 | `ELSEIF TALENT:思慕` | Tier 2 — admiring. |
-| 10 | `ELSE` | Tier 1/0 — neutral or hostile. |
+| 1 | `IF FLAG:時間停止`（`= FLAG:70`） | 時間停止 生效中；通常静默，除非在 FLAGSETTING 里设了 `CFLAG:N:時間停止口上有 = 1`。 |
+| 2 | `ELSEIF CFLAG:睡眠` | 睡眠中；静默，除非 `CFLAG:N:眠姦口上有 = 1`。 |
+| 3 | `ELSEIF FLAG:扮演` | 扮演；静默，除非 `CFLAG:N:扮演口上有 = 1`。可按 `CFLAG:(FLAG:扮演):出禁` 分支。 |
+| 4 | `ELSEIF CFLAG:318 == 1` | 「极度冷淡 / 不友好」—— 许多角色都有这个。 |
+| 5 | `ELSEIF CFLAG:诶嘿嘿 == 2` | 「醉后嬉闹的『诶嘿嘿』情绪」—— 再按 `TCVAR:20` 分子动作。 |
+| 6 | `ELSEIF TALENT:恋人` | 第 5 层 —— 伴侣。 |
+| 7 | `ELSEIF TALENT:愛欲 \|\| TALENT:炮友` | 第 4 层 —— 无承诺的情欲。 |
+| 8 | `ELSEIF TALENT:恋慕` | 第 3 层 —— 恋慕。 |
+| 9 | `ELSEIF TALENT:思慕` | 第 2 层 —— 思慕。 |
+| 10 | `ELSE` | 第 1/0 层 —— 中立或敌对。 |
 
-Some authors collapse this into a helper `陥落状態()` returning 0..5; bodies then use `IF 陥落状態() >= 4 ...` instead of testing TALENT directly.
+有些作者把它收拢进一个 helper `陥落状態()`，返回 0..5；主体便用 `IF 陥落状態() >= 4 ...` 代替直接测试 TALENT。
 
-### 9.2 Official-template (4-tier) cascade — for simpler or partially-populated kojo
+### 9.2 官方模板（4 层）连锁 —— 用于较简单或部分填充的口上
 
-This is the cascade the official empty template (`reference-kojo/口上テンプレ/`) uses by default:
+这是官方空模板（`reference-kojo/口上テンプレ/`）默认使用的连锁：
 
 ```erb
-IF LOCAL:1 && FIRSTTIME(SELECTCOM)   ; first-time line (optional opener)
+IF LOCAL:1 && FIRSTTIME(SELECTCOM)   ; 初次台词（可选的开场）
     PRINTFORMW <first-time-line>
     RETURN 1
 ENDIF
 ;基本セット
-IF FLAG:70                            ; 時姦中 (time-stop)
+IF FLAG:70                            ; 時姦中（時間停止）
     PRINTFORMW <time-stop-line>
     RETURN 1
-ELSEIF TALENT:恋慕                    ; in love
+ELSEIF TALENT:恋慕                    ; 恋慕
     PRINTFORMW <love-line>
     RETURN 1
-ELSEIF MARK:不埒刻印 == 3             ; lv3 submission imprint
+ELSEIF MARK:不埒刻印 == 3             ; lv3 不埒刻印
     PRINTFORMW <submission-line>
     RETURN 1
-ELSE                                  ; everything else
+ELSE                                  ; 其他一切
     PRINTFORMW <default-line>
     RETURN 1
 ENDIF
 ```
 
-**Use the 4-tier** when the user's persona/character is simple, when they don't care about per-tier nuance, or when they want to populate just the most-common cases and let everything else fall through. **Use the 10-tier** when the user explicitly wants rich tier-distinct flavor (e.g. distinct lines for 思慕 vs 恋慕 vs 愛欲 vs 恋人), or when the persona requires gating on 扮演/CFLAG:318 etc.
+**用 4 层**：当用户的人格/角色简单、当他们不在意每层细微差别、或当他们只想填充最常见的少数情形而让其余一切回退穿过时。**用 10 层**：当用户明确想要丰富的、逐层不同的调味（例如 思慕 vs 恋慕 vs 愛欲 vs 恋人 各有不同台词），或当人格需要按 扮演/CFLAG:318 等设门时。
 
-Both are valid and match published kojo in the install. Don't force the 10-tier onto a body where 4 lines is enough.
+两者都有效，也都能对上安装里已发布的口上。别把 10 层硬塞进一个 4 行就够的主体。
 
-### 9.3 Sex-command intermediate guards
+### 9.3 性交系命令的中间守卫
 
-For sex commands (60-77, 95, plus 逆アナル 90-95), add intermediate guards on `BASE:MASTER:勃起`, `TCVAR:破瓜`, `TFLAG:193` (success grade), `TFLAG:194` (SELECTCOM record), etc. — refer to the doc-banner state contract above each command in the template, and to `references/02-state-bus-namespaces.md`.
+对性交系命令（60-77、95，外加逆アナル 90-95），加中间守卫，判定 `BASE:MASTER:勃起`、`TCVAR:破瓜`、`TFLAG:193`（成功等级）、`TFLAG:194`（SELECTCOM 记录）等 —— 参照模板里每个命令上方的文档横幅状态契约，以及 `references/02-state-bus-namespaces.md`。
 
-### 9.4 Early-return warning
+### 9.4 提前返回警告
 
-Every early-return condition above the TALENT cascade *suppresses all relationship content below it*. For broad conditions (room class, weather, time-of-day), prefer RAND-gating or moving the condition inside relationship branches as flavor sub-conditions, instead of as an early-return blocker.
+TALENT 连锁之上的每一个提前返回条件都会*压制它下面所有的关系内容*。对于宽泛条件（房间类别、天气、时段），优先用 RAND 设门，或把该条件作为调味子条件移进关系分支内部，而不是作为提前返回的拦截器。
 
 ### 9.5 内容自查：生成完一段对话后，回头过一遍这四点
 
@@ -734,171 +734,171 @@ PRINTFORMW 【%CALLNAME:{id}%的好感度 -{LOCAL}　信赖度 -20】
 
 ---
 
-## 10. When the user asks for X — quick recipes
+## 10. 当用户要求做 X 时 —— 快速范式
 
-Three common workflows. **Full worked examples** with file scaffolds, exact labels, and Chinese-prose templates are in `references/06-workflow-recipes.md`.
+三种常见工作流。**完整实战范例**（含文件脚手架、精确标签和中文正文模板）在 `references/06-workflow-recipes.md`。
 
-### 10.1 New variant from scratch (target: empty char dir)
+### 10.1 从零新建一个变体（目标：空角色目录）
 
-1. **Before scaffolding, read the official template.** `reference-kojo/口上テンプレ/` is the canonical empty skeleton shipped with the skill. At minimum skim:
-   - `M_KOJO_KX_イベント.ERB` — existence label, FLAGSETTING, COLOR, UPDATE, ENCOUNTER, BEFORETRAIN, SPEVENT 1-3, EVENT 1-34 (with full ARG doc-banners), DAILY_EVENT 2/4/12, ONABARE_1/2/3, LOST_VIRGIN_STOP, PERMISSION_1/2, GIFT, MUSHI_BATTLE, GRAVITY, SUIKA, RUN_INTO, SF_CONTRACT_EVENT, CHECK_IRAI_BLOCKED.
-   - The TOC banners of `M_KOJO_KX_日常系コマンド.ERB` and `M_KOJO_KX_性交系コマンド.ERB` (grep `^;[0-9]+,` for command-id banners — don't read every body).
-   - `of_new_kojo_api.ERB` if the user wants the new custom-API features.
+1. **搭建前，先读官方模板。** `reference-kojo/口上テンプレ/` 是随 skill 附带的权威空骨架。至少略读：
+   - `M_KOJO_KX_イベント.ERB` —— 存在标签、FLAGSETTING、COLOR、UPDATE、ENCOUNTER、BEFORETRAIN、SPEVENT 1-3、EVENT 1-34（含完整 ARG 文档横幅）、DAILY_EVENT 2/4/12、ONABARE_1/2/3、LOST_VIRGIN_STOP、PERMISSION_1/2、GIFT、MUSHI_BATTLE、GRAVITY、SUIKA、RUN_INTO、SF_CONTRACT_EVENT、CHECK_IRAI_BLOCKED。
+   - `M_KOJO_KX_日常系コマンド.ERB` 和 `M_KOJO_KX_性交系コマンド.ERB` 的 TOC 横幅（grep `^;[0-9]+,` 找命令 id 横幅 —— 别读每个主体）。
+   - 若用户想要新的自定义 API 特性，则读 `of_new_kojo_api.ERB`。
 
-   The doc-banner comments in the template ARE the spec — they tell you which `CFLAG` gates each label, what `ARG`/`ARG:1` mean per slot, and the return-value contracts (`PERMISSION_1` body returns -1/0/1, `LOST_VIRGIN_STOP` body returns 1=abort/0=proceed, `EVENT_KX_26_1` body returns -1/0/1, etc.). **This is the single most-load-bearing prep step.**
+   模板里的文档横幅注释*即是规范* —— 它们告诉你哪个 `CFLAG` 为每个标签设门、每个槽位的 `ARG`/`ARG:1` 是什么意思，以及返回值契约（`PERMISSION_1` 主体返回 -1/0/1，`LOST_VIRGIN_STOP` 主体返回 1=中止/0=继续，`EVENT_KX_26_1` 主体返回 -1/0/1，等）。**这是最承重的准备步骤。**
 
-   Only consult `reference-kojo/reimu/` when you need to see a *filled-in* example of a specific body — grep `reimu/M_KOJO_K1_コマンド.ERB` for the command-id you're working on. Don't read whole Reimu files; they're old and monolithic.
+   只在你需要看某个具体主体的*填好*范例时才查阅 `reference-kojo/reimu/` —— grep `reimu/M_KOJO_K1_コマンド.ERB` 找你正在做的命令 id。别通读整个灵梦文件；它们又老又庞杂。
 
-   If the user's target character has a same-style sibling/peer with an existing kojo (e.g. one of three sisters, two characters of the same persona type), grep that one too; it'll often have the right `CFLAG:TARGET:*` situational branches and tone.
+   如果用户的目标角色有一个同风格的姊妹/同类角色已有口上（例如三姊妹之一、同人格类型的两个角色），也 grep 那个；它往往会有正确的 `CFLAG:TARGET:*` 情境分支和语气。
 
-2. Confirm character ID and dir name (use `references/08-character-id-table.md` or grep `Chara/`).
+2. 确认角色 ID 和目录名（用 `references/08-character-id-table.md` 或 grep `Chara/`）。
 
-3. **Scaffold the modern multi-file split** as the official template does:
-   - **Always**: `イベント / 日常系コマンド / セクハラコマンド / 愛撫系コマンド / 加虐系コマンド / 道具系コマンド / 性交系コマンド / 派生コマンド / カウンター / 弾幕勝負 / 刻印取得 / 絶頂`.
-   - **Common**: `奉仕系コマンド / 道具系 / ハードなコマンド / 依頼 / 育児イベント / 日記 (or 日記（簡易版）)`.
-   - **Optional**: `自慰系(あなた)コマンド / 固有カウンター / of_new_kojo_api / 関数ライブラリ / INFO / <chara>特殊イベント`.
+3. **按官方模板搭建现代多文件拆分：**
+   - **总是**：`イベント / 日常系コマンド / セクハラコマンド / 愛撫系コマンド / 加虐系コマンド / 道具系コマンド / 性交系コマンド / 派生コマンド / カウンター / 弾幕勝負 / 刻印取得 / 絶頂`。
+   - **常见**：`奉仕系コマンド / 道具系 / ハードなコマンド / 依頼 / 育児イベント / 日記 (or 日記（簡易版）)`。
+   - **可选**：`自慰系(あなた)コマンド / 固有カウンター / of_new_kojo_api / 関数ライブラリ / INFO / <chara>特殊イベント`。
 
-   File names are `M_KOJO_K<id>_<category>.ERB`. Match the template's filenames byte-for-byte (including 全角 parentheses in `自慰系(あなた)コマンド.ERB`). Reimu's monolithic single-`コマンド.ERB` layout is legacy — don't mirror it.
+   文件名是 `M_KOJO_K<id>_<category>.ERB`。逐字节匹配模板的文件名（包括 `自慰系(あなた)コマンド.ERB` 里的全角括号）。灵梦的单一 `コマンド.ERB` 庞杂布局是遗留写法 —— 别照搬。
 
-4. In `イベント.ERB` write the existence label `@M_KOJO_K<id>(ARG) RETURN 1` plus FLAGSETTING (with CFLAG enable-flags for the silent helpers you want — `破瓜キャンセル口上有`, `口上内抱き寄せ判定_初回`, `口上内抱き寄せ判定_通常`, `時間停止口上有`, `眠姦口上有`, `なりきり口上有`), COLOR, UPDATE, ENCOUNTER skeletons.
+4. 在 `イベント.ERB` 里写存在标签 `@M_KOJO_K<id>(ARG) RETURN 1`，加上 FLAGSETTING（含你想要的静默 helper 的 CFLAG 启用标志 —— `破瓜キャンセル口上有`、`口上内抱き寄せ判定_初回`、`口上内抱き寄せ判定_通常`、`時間停止口上有`、`眠姦口上有`、`なりきり口上有`）、COLOR、UPDATE、ENCOUNTER 骨架。
 
-5. Fill ~5-10 most useful daily commands (300=会話, 301=泡茶, 302=身体接觸, 309=摸頭, 311=擁抱, 312=接吻, …) using the §7 template (with either §9.1 maximal or §9.2 4-tier cascade depending on persona complexity).
+5. 用 §7 模板填充约 5-10 个最有用的日常命令（300=会話, 301=泡茶, 302=身體接觸, 309=摸頭, 311=擁抱, 312=接吻, …），按人格复杂度选用 §9.1 最大连锁或 §9.2 4 层连锁。
 
-6. Leave `LOCAL = 0` stubs for everything else — engine falls back to default narration.
+6. 其余一切留 `LOCAL = 0` 存根 —— 引擎回退到默认叙述。
 
-7. Run §2 verification pass.
+7. 跑 §2 校验流程。
 
-### 10.2 Adding a one-shot scripted event (anniversary, holiday, etc.)
+### 10.2 加一个一次性脚本事件（纪念日、节日等）
 
-1. Decide the trigger: `@SPECIALDAY_EVENT_K<id>` for date-based, `@K<id>_<NAME>` author-private for state-driven.
-2. Reserve a state-progress CFLAG (range 1000–1999, document it in `フラグ管理メモ.txt`).
-3. Author the event body — usually a multi-step scene with `CALL ASK_YN(...)` at branching points and `SOURCE:N:<slot> += <delta>` on completion.
-4. Hook the trigger from the existing `イベント.ERB` (add a `SIF <conditions> / CALL <event>` line in the appropriate engine slot).
+1. 决定触发器：基于日期用 `@SPECIALDAY_EVENT_K<id>`，基于状态用作者私有的 `@K<id>_<NAME>`。
+2. 预留一个状态进度 CFLAG（区段 1000–1999，在 `フラグ管理メモ.txt` 里记录）。
+3. 编写事件主体 —— 通常是一个多步场景，在分支点用 `CALL ASK_YN(...)`，完成时用 `SOURCE:N:<slot> += <delta>`。
+4. 从现有 `イベント.ERB` 挂上触发器（在合适的引擎槽位里加一行 `SIF <conditions> / CALL <event>`）。
 
-### 10.3 Modifying an existing kojo (small content tweak)
+### 10.3 修改现有口上（小的内容调整）
 
-1. Identify the file (which `M_KOJO_K<id>_<category>.ERB`).
-2. Find the body label (`grep '^@'` for the relevant `_<cmd>` or `_<n>`).
-3. Add the new branch in the right cascade position. For weather/time conditions, prefer **inside** the relationship branches (as flavor) over **before** them (as an early-return that blocks rich content).
+1. 确定文件（哪个 `M_KOJO_K<id>_<category>.ERB`）。
+2. 找到主体标签（`grep '^@'` 找相关的 `_<cmd>` 或 `_<n>`）。
+3. 在连锁正确位置加新分支。对于天气/时段条件，优先放在关系分支**内部**（作为调味），而非放在它们**之前**（作为会挡住丰富内容的提前返回）。
 
 ---
 
-## 11. Final reminders for you (the helper LLM)
+## 11. 给你（辅助 LLM）的最后提醒
 
 > **这两条压过下面所有内容：**
 > - **⛔ 写操作只落在口上文件夹里（§0.7）**，且不做有系统级永久影响的操作——除非用户明确、当次要求。**不确定就停下来问。** 引擎侧的问题：报告根因 + 给用户自查/自改的办法，别自己动手。
 > - **自觉维护口上文件夹里的 `HANDOFF.md`（§0.8）**——你的 context 会被压缩、session 可能丢失，而用户不会提醒你。当场更新；压缩后回来第一件事是读它。
 
-1. **Structure first, prose later.** Always scaffold files and label names *before* asking the user about content.
-2. **Default to the standard cascade** (§9). Only add custom guards when the user's persona explicitly requires.
-3. **Use `LOCAL = 0` stubs liberally** — those slots fall back to engine defaults. Don't force the user to fill everything.
-4. **Always emit both `SUCCESS_COM` and `MESSAGE_COM`** for any command. Even if SUCCESS is just `TFLAG:192 = 0`.
-5. **Update `SOURCE:N:<slot>`** in counter / unique-counter handlers. Without it the kojo prints text but doesn't shift affection.
-6. **Use `%CALLNAME:MASTER%`**, not 你/主人公/etc.
-7. **Don't quote R18 lines from existing kojo.** When showing examples, redact prose to placeholders.
-8. **For ID lookup**: char ID = leading number in the dir name. Confirm with `references/data/Chara/Chara<N> <name>.csv`.
-9. **For new-API features** (`@KOJO_CUSTOM_BUTTON_*` etc.): only use if you've confirmed the user runs a recent engine. Wrap in `[SKIPSTART]/[SKIPEND]` if uncertain.
-10. **Persistent storage**: prefer `CFLAG:N:1000-1999` (author-private) and `TCVAR:N:350-399` (author-private) over `SAVEDATA` modifiers.
-11. **For inter-character interactions**: read each character's ID from the directory list. Use `RELATION:N:M` if the engine supports it; otherwise compose from `CFLAG:M:好感度`.
-12. **Test mentally before delivering**: do the labels match? Is the existence check returning 1? Are guards in the right cascade order?
-13. **Always run §2 verification pass** before declaring done. The most-common bugs are detectable mechanically.
-14. **In Claude Code mode, lazy-load references** — only fetch what the current question needs. In chatbot mode, name the specific file the user should upload.
+1. **先结构，后正文。** 总是先搭好文件和标签名，*再*问用户内容。
+2. **默认用标准连锁**（§9）。只在用户人格明确需要时才加自定义守卫。
+3. **大方地用 `LOCAL = 0` 存根** —— 那些槽位会回退到引擎默认。别逼用户把什么都填满。
+4. **对任何命令都始终同时输出 `SUCCESS_COM` 和 `MESSAGE_COM`**。即便 SUCCESS 只是 `TFLAG:192 = 0`。
+5. **在 counter / unique-counter 处理器里更新 `SOURCE:N:<slot>`**。不然口上会打印文本却不改变好感。
+6. **用 `%CALLNAME:MASTER%`**，而非 你/主人公/等。
+7. **别引用现有口上里的 R18 台词。** 展示范例时，把正文涂改成占位符。
+8. **ID 查找**：角色 ID = 目录名开头的数字。用 `references/data/Chara/Chara<N> <name>.csv` 确认。
+9. **新 API 特性**（`@KOJO_CUSTOM_BUTTON_*` 等）：只在你已确认用户跑的是较新引擎时才用。不确定就用 `[SKIPSTART]/[SKIPEND]` 包起来。
+10. **持久存储**：优先用 `CFLAG:N:1000-1999`（作者私有）和 `TCVAR:N:350-399`（作者私有），而非 `SAVEDATA` 修饰符。
+11. **角色间互动**：从目录列表读每个角色的 ID。若引擎支持则用 `RELATION:N:M`；否则从 `CFLAG:M:好感度` 组合。
+12. **交付前在脑中测试**：标签对得上吗？存在检查返回 1 吗？守卫在连锁里的次序对吗？
+13. **宣布完成前始终跑 §2 校验流程**。最常见的 bug 都能机械地检测到。
+14. **在 Claude Code 模式下，惰性加载 references** —— 只取当前问题需要的。在聊天机器人模式下，点明用户该上传的具体文件。
 
-When the user asks "make X react to Y," the formula is:
-- **WHAT slot?** Identify the engine label (command / event / counter).
-- **WHAT guard?** Identify the discriminant (TFLAG / CFLAG / TALENT / time / weather).
-- **WHAT body?** Generate `PRINTFORML` lines that reflect requested persona × guard.
+当用户问「让 X 对 Y 作出反应」时，公式是：
+- **哪个槽位？** 确定引擎标签（命令 / 事件 / counter）。
+- **哪个守卫？** 确定判别式（TFLAG / CFLAG / TALENT / 时间 / 天气）。
+- **什么主体？** 生成反映「所求人格 × 守卫」的 `PRINTFORML` 台词。
 
-Then deliver the patch. Use unified-diff style if modifying, full-file style if creating. Speak Chinese to the user; keep engine identifiers in their original Japanese/English.
+然后交付补丁。修改用统一 diff 风格，创建用整文件风格。对用户说中文；引擎标识符保持其原始日文/英文。
 
-Good luck. The user is making a creative thing they care about; your job is the boring infrastructure work so they can focus on their character.
+祝好运。用户在做一件他们珍视的创意作品；你的工作是那些枯燥的基础设施活儿，好让他们专注于自己的角色。
 
 ---
 
-## 12. The community tutorial corpus (`原版+前人整合等各种readme/`)
+## 12. 社区教程语料库（`原版+前人整合等各种readme/`）
 
-Your eraTW install almost certainly ships a directory `原版+前人整合等各种readme/` (literally "originals + various-prior-author-integration readmes"). **This is the original Japanese community's tutorial + reference corpus, and most of the structural knowledge in this skill is sourced from there.** It's not loaded by the engine — it lives in the install for human reference.
+你的 eraTW 安装几乎必然附带一个目录 `原版+前人整合等各种readme/`（字面意思「原版 + 各种前人整合的 readme」）。**这是原始日文社区的教程 + 参考语料库，本 skill 里的大部分结构性知识都源自那里。** 它不会被引擎加载 —— 它存在于安装里供人参考。
 
-You normally don't need to read it: the skill has already extracted the relevant parts into `reference-kojo/` and `references/`. But you should **know it exists**, because (a) the user may reference it (asking "what's in `便利な関数.txt`?"), (b) the user may have a **newer version** of the corpus than what this skill was built from, and (c) for niche topics not covered here, it's the authoritative source.
+你通常不需要读它：skill 已把相关部分提取进了 `reference-kojo/` 和 `references/`。但你应该**知道它存在**，因为 (a) 用户可能引用它（问「`便利な関数.txt` 里有什么？」），(b) 用户手上的语料库可能比本 skill 构建时**更新**，(c) 对本文未覆盖的小众主题，它是权威出处。
 
-### 12.1 Structure of `原版+前人整合等各种readme/`
+### 12.1 `原版+前人整合等各种readme/` 的结构
 
 ```
 原版+前人整合等各种readme/
-├── eraTW_FAQ.txt                       ; player-facing FAQ (not for modders)
-├── 更新内容・readme.txt                  ; ~400 KB changelog
-├── 今後の課題・方針・思いつきetc.txt     ; maintainer's roadmap / notes
-├── 改造とかしてみたい人のためのあれこれ/   ; THE MODDING TUTORIALS — read this first
-│   ├── 口上関連/                         ; everything kojo-specific
+├── eraTW_FAQ.txt                       ; 面向玩家的 FAQ（非给改造者）
+├── 更新内容・readme.txt                  ; ~400 KB 更新日志
+├── 今後の課題・方針・思いつきetc.txt     ; 维护者的路线图 / 笔记
+├── 改造とかしてみたい人のためのあれこれ/   ; 改造教程 —— 先读这个
+│   ├── 口上関連/                         ; 一切与口上相关的
 │   │   ├── worldパッチ制作者による超初心者向け口上の書き方入門.txt
-│   │   │                                 ; ★★★ The maintainer's beginner kojo intro (100 lines)
+│   │   │                                 ; ★★★ 维护者的口上初学者入门（100 行）
 │   │   ├── TW口上作成周辺の注訳.txt
-│   │   │                                 ; ★★★ "Tutorial-written-as-kojo" — covers IF/ELSEIF/SIF, &&/||, CFLAG, PRINTDATA
+│   │   │                                 ; ★★★ 「以口上形式写就的教程」—— 覆盖 IF/ELSEIF/SIF、&&/||、CFLAG、PRINTDATA
 │   │   ├── 口上作者様へ.txt
-│   │   │                                 ; ★★★★ Authoritative ENCOUNTER/EVENT 1-23/SP_EVENT 1-3 ARG semantics
+│   │   │                                 ; ★★★★ 权威的 ENCOUNTER/EVENT 1-23/SP_EVENT 1-3 ARG 语义
 │   │   ├── 超初心者向け使用頻度の高い変数の説明.txt
-│   │   │                                 ; ★★★ FLAG vs CFLAG vs TFLAG vs TCVAR vs TALENT vs ABL vs BASE one-liners
-│   │   ├── 口上テンプレ/                  ; ★★★★★ THE OFFICIAL EMPTY TEMPLATE — copied verbatim into reference-kojo/口上テンプレ/
-│   │   ├── 別人版用口上テンプレ/          ; same template but for "alternate-personality" variants
+│   │   │                                 ; ★★★ FLAG vs CFLAG vs TFLAG vs TCVAR vs TALENT vs ABL vs BASE 一句话解释
+│   │   ├── 口上テンプレ/                  ; ★★★★★ 官方空模板 —— 逐字复制进 reference-kojo/口上テンプレ/
+│   │   ├── 別人版用口上テンプレ/          ; 同一模板但用于「别人格」变体
 │   │   ├── 口上ファイル以外のキャラ別メッセージ等.txt
-│   │   ├── 口上作者様へ.txt              ; (same as above — see ★★★★)
-│   │   ├── 日記帳れどめ.txt              ; diary-system documentation
-│   │   ├── eraTheWorld proto4.11 イベントまとめ(仮)/     ; older EVENT reference (superseded)
-│   │   ├── txt口上ノート/                ; plain-text kojo planning worksheets
-│   │   └── TW用私製テンプレ/            ; one author's alternate template style
-│   ├── 便利な関数.txt                    ; ★★★★ First-party helper-function reference (ASK_YN, ASK_M, TEXTR, HPH_PRINT, FIRSTTIME, AddEXP)
-│   ├── キャラ追加のススメVer.2.0.txt     ; ★★ How to add a new character (CSV layer + chara-data + CHARAMOVE)
-│   ├── キャラ設定向け参考資料.txt        ; character-stats setting guidance
-│   ├── 改造関連FAQ.txt                   ; ★★ Don't-use-Notepad, use Sakura Editor, etc.
-│   ├── お手軽！…仕事の追加講座.txt     ; easy job-add for non-programmers
-│   ├── 下着追加のススメ80%版.txt         ; underwear-system mod tutorial
-│   ├── eTW用コマンド作成例/              ; command-creation examples (COMF system)
-│   ├── eratohoTWサクラエディタ用キーワードヘルプ/    ; Sakura Editor syntax highlighting
-│   ├── MOB子素材作成のすすめ20180409/    ; mob-character asset creation
-│   ├── NewIraiSystem.txt                 ; new IRAI (quest) system
-│   ├── CharaXX テンプレ.csv              ; CSV template
-│   ├── IRAI_XX 依頼テンプレ.ERB          ; quest template
-│   ├── ROOMSETTING_XX.ERB                ; room-setting template
-│   ├── IMAGE_IXX_○○ テンプレ.ERB        ; per-char image template
-│   └── DAIRY_EVテンプレ.ERB              ; daily-event template
-├── 資料/                                 ; reference tables (Shift-JIS encoded — read with --encoding shift_jis)
-│   ├── 変数一覧/                         ; authoritative variable-ID tables
-│   │   ├── CFLAGS.txt                    ; CFLAG:N ID table (273 lines)
-│   │   ├── TFLAGS.txt                    ; TFLAG:N ID table (111 lines)
+│   │   ├── 口上作者様へ.txt              ; （同上 —— 见 ★★★★）
+│   │   ├── 日記帳れどめ.txt              ; 日记系统文档
+│   │   ├── eraTheWorld proto4.11 イベントまとめ(仮)/     ; 较旧的 EVENT 参考（已被取代）
+│   │   ├── txt口上ノート/                ; 纯文本口上规划工作表
+│   │   └── TW用私製テンプレ/            ; 某作者的另一种模板风格
+│   ├── 便利な関数.txt                    ; ★★★★ 第一方 helper 函数参考（ASK_YN, ASK_M, TEXTR, HPH_PRINT, FIRSTTIME, AddEXP）
+│   ├── キャラ追加のススメVer.2.0.txt     ; ★★ 如何加一个新角色（CSV 层 + 角色数据 + CHARAMOVE）
+│   ├── キャラ設定向け参考資料.txt        ; 角色数值设定指导
+│   ├── 改造関連FAQ.txt                   ; ★★ 别用记事本、用 Sakura Editor 等
+│   ├── お手軽！…仕事の追加講座.txt     ; 面向非程序员的简易加工作
+│   ├── 下着追加のススメ80%版.txt         ; 内衣系统改造教程
+│   ├── eTW用コマンド作成例/              ; 命令创建示例（COMF 系统）
+│   ├── eratohoTWサクラエディタ用キーワードヘルプ/    ; Sakura Editor 语法高亮
+│   ├── MOB子素材作成のすすめ20180409/    ; mob 角色素材创建
+│   ├── NewIraiSystem.txt                 ; 新 IRAI（委托）系统
+│   ├── CharaXX テンプレ.csv              ; CSV 模板
+│   ├── IRAI_XX 依頼テンプレ.ERB          ; 委托模板
+│   ├── ROOMSETTING_XX.ERB                ; 房间设定模板
+│   ├── IMAGE_IXX_○○ テンプレ.ERB        ; 按角色的图像模板
+│   └── DAIRY_EVテンプレ.ERB              ; 日常事件模板
+├── 資料/                                 ; 参考表（Shift-JIS 编码 —— 用 --encoding shift_jis 读）
+│   ├── 変数一覧/                         ; 权威的变量 ID 表
+│   │   ├── CFLAGS.txt                    ; CFLAG:N ID 表（273 行）
+│   │   ├── TFLAGS.txt                    ; TFLAG:N ID 表（111 行）
 │   │   ├── TCVAR.txt, EXP.txt, FLAGS.txt, EQUIP.txt, TEQUIP.txt, …
-│   │   └── 現在位置一覧.txt              ; CFLAG:300 (current location) ID enumeration
-│   ├── 刻印取得条件.txt, 陥落系素質取得条件.txt   ; trait acquisition conditions
-│   ├── 技能成長条件.txt                  ; skill growth conditions
+│   │   └── 現在位置一覧.txt              ; CFLAG:300（当前位置）ID 枚举
+│   ├── 刻印取得条件.txt, 陥落系素質取得条件.txt   ; 特性获得条件
+│   ├── 技能成長条件.txt                  ; 技能成长条件
 │   ├── MAP.txt, 月マップ全景&ROOMSETTING一覧.txt, 紅魔館マップ全景.txt, 神社周辺見取り図.txt
-│   └── 実装済みお仕事一覧.txt            ; jobs catalog
-├── パッチ/                               ; 60+ version-pinned bugfix patches (historical, mostly irrelevant)
-└── (etc — older readmes, version notes)
+│   └── 実装済みお仕事一覧.txt            ; 工作目录
+├── パッチ/                               ; 60+ 个版本固定的 bugfix 补丁（历史性，多半无关）
+└── (etc —— 较旧的 readme、版本说明)
 ```
 
-### 12.2 What's been integrated into this skill, and what hasn't
+### 12.2 哪些已整合进本 skill，哪些还没
 
-| Source file | Where it lives in the skill |
+| 源文件 | 它在 skill 里的位置 |
 |---|---|
-| `口上テンプレ/` (whole dir) | Copied verbatim to `reference-kojo/口上テンプレ/` |
-| `口上作者様へ.txt` (EVENT 1-23 ARG semantics) | Integrated into `references/01-engine-label-catalog.md` §2.4.2 (extended to 1-34 from template) |
-| `便利な関数.txt` (ASK_YN/ASK_M/TEXTR/HPH_PRINT/FIRSTTIME/AddEXP) | Integrated into `references/03-engine-helpers.md` §5.2 / §5.6.1 |
-| `worldパッチ制作者による超初心者向け口上の書き方入門.txt` (PRINT-family, CALLNAME, SETCOLOR walkthrough) | The walkthrough's lessons are baked into §5–§8 here |
-| `TW口上作成周辺の注訳.txt` (IF/SIF/&&/PRINTDATA tutorial) | Lessons baked into §1, §7, §8 |
-| `超初心者向け使用頻度の高い変数の説明.txt` (FLAG vs CFLAG vs TFLAG one-liners) | Baked into §5 + `references/02-state-bus-namespaces.md` |
-| `日記帳れどめ.txt` (diary-system 0/1/2/3 state) | Integrated into `references/01-engine-label-catalog.md` §2.4 DIARY row |
-| `資料/変数一覧/*.txt` (CFLAG/TFLAG/TCVAR ID enumeration) | **Not integrated** — the skill assumes you read `references/data/CFLAG.csv` etc. for per-slot lookup. The Japanese textfiles cover the same data but in Shift-JIS. If a user asks "what's CFLAG:341 for?" and your CSV doesn't have it, check `資料/変数一覧/CFLAGS.txt`. |
-| `キャラ追加のススメVer.2.0.txt` (new-character CSV scaffolding) | **Not integrated** — out of scope (this skill is kojo-only). If the user wants to scaffold a *whole new character* (CSV + CHARAMOVE + キャラデータ + kojo), point them at this file. |
-| `パッチ/` (version-pinned bugfix patches) | **Not integrated** — historical. |
-| `eTW用コマンド作成例/` (command-creation examples) | **Not integrated** — out of scope. |
-| `下着追加のススメ80%版.txt` (underwear mod) | **Not integrated** — out of scope. |
-| `NewIraiSystem.txt` (new quest system) | **Not integrated** — relevant only if the user wants to add a new quest type; quest *dialogue* is covered. |
+| `口上テンプレ/`（整个目录） | 逐字复制到 `reference-kojo/口上テンプレ/` |
+| `口上作者様へ.txt`（EVENT 1-23 ARG 语义） | 整合进 `references/01-engine-label-catalog.md` §2.4.2（据模板扩展到 1-34） |
+| `便利な関数.txt`（ASK_YN/ASK_M/TEXTR/HPH_PRINT/FIRSTTIME/AddEXP） | 整合进 `references/03-engine-helpers.md` §5.2 / §5.6.1 |
+| `worldパッチ制作者による超初心者向け口上の書き方入門.txt`（PRINT 家族、CALLNAME、SETCOLOR 走查） | 该走查的经验烘焙进了此处的 §5–§8 |
+| `TW口上作成周辺の注訳.txt`（IF/SIF/&&/PRINTDATA 教程） | 经验烘焙进 §1、§7、§8 |
+| `超初心者向け使用頻度の高い変数の説明.txt`（FLAG vs CFLAG vs TFLAG 一句话） | 烘焙进 §5 + `references/02-state-bus-namespaces.md` |
+| `日記帳れどめ.txt`（日记系统 0/1/2/3 状态） | 整合进 `references/01-engine-label-catalog.md` §2.4 DIARY 行 |
+| `資料/変数一覧/*.txt`（CFLAG/TFLAG/TCVAR ID 枚举） | **未整合** —— skill 假定你去读 `references/data/CFLAG.csv` 等做按槽位查找。这些日文文本文件覆盖同样的数据，但用 Shift-JIS。若用户问「CFLAG:341 干嘛的？」而你的 CSV 里没有，去查 `資料/変数一覧/CFLAGS.txt`。 |
+| `キャラ追加のススメVer.2.0.txt`（新角色 CSV 搭建） | **未整合** —— 超出范围（本 skill 只管口上）。若用户想搭建一个*全新角色*（CSV + CHARAMOVE + 角色数据 + 口上），把他们指向此文件。 |
+| `パッチ/`（版本固定的 bugfix 补丁） | **未整合** —— 历史性。 |
+| `eTW用コマンド作成例/`（命令创建示例） | **未整合** —— 超出范围。 |
+| `下着追加のススメ80%版.txt`（内衣改造） | **未整合** —— 超出范围。 |
+| `NewIraiSystem.txt`（新委托系统） | **未整合** —— 仅当用户想加一种新委托类型时相关；委托*对话*已覆盖。 |
 
-### 12.3 Skill version vs install version
+### 12.3 skill 版本 vs 安装版本
 
-**This skill was built against the corpus as of approximately 2024-05 (the file `mtime` on the source dir).** The user's install may be newer. eraTW updates slowly and almost all updates are backwards-compatible with existing kojo, so the EVENT slot numbers / CFLAG IDs / label naming conventions you see here should still work — but be aware:
+**本 skill 是针对大约 2024-05 时的语料库构建的（源目录上的文件 `mtime`）。** 用户的安装可能更新。eraTW 更新缓慢，且几乎所有更新都向后兼容现有口上，因此你在此看到的 EVENT 槽位号 / CFLAG ID / 标签命名约定应该仍然有效 —— 但要留意：
 
-- **If the user's install has newer files in `原版+前人整合等各种readme/口上関連/口上テンプレ/`** (e.g. a file named `M_KOJO_KX_<新カテゴリ>.ERB` you don't recognize), trust their copy. Check the file directly — its doc-banner comments will tell you what it's for.
-- **If the user reports an engine warning about a label that this skill doesn't document** (e.g. `@M_KOJO_FOO_K20` raised a warning), suggest they check the corresponding ERB engine file in their install. The engine source is the ultimate authority; this skill is a curated extract.
-- **If the user references a tutorial or template file that's not in the table above**, ask them to share it — it may be new since this skill's last update.
+- **如果用户的安装在 `原版+前人整合等各种readme/口上関連/口上テンプレ/` 里有更新的文件**（例如一个你不认识的名为 `M_KOJO_KX_<新カテゴリ>.ERB` 的文件），信任他们的副本。直接看那个文件 —— 它的文档横幅注释会告诉你它是做什么的。
+- **如果用户报告一个本 skill 未记载的标签的引擎警告**（例如 `@M_KOJO_FOO_K20` 触发了警告），建议他们查安装里对应的 ERB 引擎文件。引擎源码是最终权威；本 skill 是一份经整理的摘录。
+- **如果用户引用了上表之外的某个教程或模板文件**，让他们分享 —— 它可能是本 skill 上次更新后新增的。
 
-You don't need to scan the corpus directory yourself unless the user specifically asks about something that's not covered here. The point of §12 is just: know it exists, know roughly what's in it, know where it lives in the install.
+除非用户明确询问本文未覆盖的某样东西，否则你不需要自己扫描该语料库目录。§12 的要点只是：知道它存在、大致知道里面有什么、知道它在安装里的位置。

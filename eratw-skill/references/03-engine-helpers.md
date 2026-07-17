@@ -1,30 +1,30 @@
-# Engine helpers (full reference)
+# 引擎 helper（完整参考）
 
-## 5. Engine helpers
+## 5. 引擎 helper
 
-### 5.1 Pre-message & cooperation
+### 5.1 前置消息与协同
 
 ```erb
-CALL TRAIN_MESSAGE                  ; engine pre-narration for COMs
-CALL EVENT_COUNTER_MESSAGE          ; engine pre-narration for COUNTERs
-CALL MARK_MESSAGE                   ; engine pre-narration for MARKCNG
-CALL SPEVENT_MESSAGE_<n>(ARG, ARG:1); engine pre-narration for SPEVENT n
-CALL AUTO_AEGI(N)                   ; engine fallback auto-moan
-CALL ADD_KISS                       ; increment kiss counter
+CALL TRAIN_MESSAGE                  ; 针对 COM 的引擎前置旁白
+CALL EVENT_COUNTER_MESSAGE          ; 针对 COUNTER 的引擎前置旁白
+CALL MARK_MESSAGE                   ; 针对 MARKCNG 的引擎前置旁白
+CALL SPEVENT_MESSAGE_<n>(ARG, ARG:1); 针对 SPEVENT n 的引擎前置旁白
+CALL AUTO_AEGI(N)                   ; 引擎兜底自动喘息
+CALL ADD_KISS                       ; 递增接吻计数器
 ```
 
-### 5.2 UI prompts
+### 5.2 UI 提示
 
 ```erb
-CALL ASK_YN                            ; default labels: [0] はい / [1] いいえ
-CALL ASK_YN("yes-text", "no-text")    ; sets RESULT to 0 (yes) or 1 (no) — note polarity
-CALL ASK_M("opt0", w0, "opt1", w1, …) ; multi-choice; w=0 grey-out, w=1 enable; RESULT = idx
-INPUT                                  ; read int → RESULT
-INPUTS                                 ; read str → RESULTS
+CALL ASK_YN                            ; 默认标签：[0] はい / [1] いいえ
+CALL ASK_YN("yes-text", "no-text")    ; 把 RESULT 设为 0（是）或 1（否）——注意极性
+CALL ASK_M("opt0", w0, "opt1", w1, …) ; 多选；w=0 置灰，w=1 启用；RESULT = 索引
+INPUT                                  ; 读整数 → RESULT
+INPUTS                                 ; 读字符串 → RESULTS
 PRINTBUTTON @"label", @"return-string"
 ```
 
-`ASK_YN` / `ASK_M` both loop internally on invalid input — you don't need to wrap them in your own input-loop. `ASK_M`'s per-option weight expressions become greyed-out (unselectable) when falsy:
+`ASK_YN` / `ASK_M` 两者内部都会对无效输入循环重试——你无需再自己包一层输入循环。`ASK_M` 的逐选项权重表达式在为假时会变灰（不可选）：
 
 ```erb
 CALL ASK_M("买",     MONEY >= 1000,       \
@@ -32,14 +32,14 @@ CALL ASK_M("买",     MONEY >= 1000,       \
            "撒娇",   TALENT:MASTER:謎の魅力,\
            "抢走",   ABL:MASTER:戦闘能力 >= 3)
 SELECTCASE RESULT
-    CASE 0    ;bought
-    CASE 1    ;refused
-    CASE 2    ;coaxed
-    CASE 3    ;stole
+    CASE 0    ;买了
+    CASE 1    ;拒绝
+    CASE 2    ;撒娇
+    CASE 3    ;抢走
 ENDSELECT
 ```
 
-### 5.3 Image / face / talk
+### 5.3 图像 / 表情 / 对话
 
 ```erb
 CALL PRINT_FACE, char_id, expr[, clothes[, variant]]
@@ -47,61 +47,61 @@ CALL PRINT_FACE, char_id, expr[, clothes[, variant]]
 ;   clothes ∈ "服", "服1", "裸", ...
 ;   variant ∈ "_1", "_2", "_変更後", ...
 
-CALL SPTALK, char_id, expr, ?, @"line // line // line"  ; up to 6 lines, // is line break
+CALL SPTALK, char_id, expr, ?, @"line // line // line"  ; 最多 6 行，// 为换行
 
-CALL HPH_PRINT, @"<text with HPH suffix and \@…\@ ternaries>", "L"
+CALL HPH_PRINT, @"<带 HPH 后缀和 \@…\@ 三元式的文本>", "L"
 CALL 画像セット(@"顔絵_<state>_<expr>_{[[N]]}", x, y, w, h, _, _, "default")
 CALL 画像一斉表示("左", 0, 1)
-CALL PRINT_GROUP(LOCALS, 3, 350)    ; print N items with delay
+CALL PRINT_GROUP(LOCALS, 3, 350)    ; 打印 N 个条目，带延迟
 ```
 
-### 5.4 Pose / state / equip
+### 5.4 姿势 / 状态 / 装备
 
 ```erb
-CALL TOUCH_SET(SET_FROM_YUBI, 1, [[N]])   ; register touch
-CALL EVENT_COUNTER_POSE_69([[N]], M)       ; set 69 pose
-CALL DATUI_BOTTOM([[N]], M)                ; M=1 pull down, M=2 strip
-CALL DATUI_TOP, CALL DATUI_INNER           ; same family
+CALL TOUCH_SET(SET_FROM_YUBI, 1, [[N]])   ; 登记触碰
+CALL EVENT_COUNTER_POSE_69([[N]], M)       ; 设置 69 姿势
+CALL DATUI_BOTTOM([[N]], M)                ; M=1 拉下，M=2 脱去
+CALL DATUI_TOP, CALL DATUI_INNER           ; 同一族
 ```
 
-### 5.5 Predicates / accessors
+### 5.5 判定式 / 访问器
 
 ```erb
 RAND:N, RAND(N)
-FIRSTTIME(SELECTCOM)                       ; first time using cmd
-FIRSTTIME("UP01", 0, 49)                   ; string-keyed firsttime
-GROUPMATCH(VAR, V1, V2, V3)                ; equivalent to ==
+FIRSTTIME(SELECTCOM)                       ; 首次使用某命令
+FIRSTTIME("UP01", 0, 49)                   ; 以字符串为键的 firsttime
+GROUPMATCH(VAR, V1, V2, V3)                ; 等价于 ==
 BATHROOM(loc), OUTROOF(loc), DATE_HITOGOMI(loc), WITH_MOB()
 GET_MAPID(loc)
-GET_TARGETNUM()                            ; chars in current room
+GET_TARGETNUM()                            ; 当前房间中的角色数
 FINDCHARA(start_loc, current_loc)
-SHIRAHU(N)                                 ; char N in normal state
-CHK_DATENOW(CFLAG:N:约会中)                ; date currently underway (note simplified 约!)
+SHIRAHU(N)                                 ; 角色 N 处于正常状态
+CHK_DATENOW(CFLAG:N:约会中)                ; 约会正在进行中（注意是简体 约！）
 ;
-; CRITICAL — `CFLAG:N:约会中` is NOT a boolean; it stores the MAIN_MAP code at
-; date start. After ANY date in this character's history, the slot holds that
-; map code (e.g. 5) and is NEVER auto-reset. So `IF CFLAG:N:约会中` is
-; effectively `IF 5` = always true after first date.
+; 关键——`CFLAG:N:约会中` 不是布尔值；它在约会开始时存储的是
+; MAIN_MAP 代码。在本角色历史上发生过任何一次约会之后，该槽位就
+; 保留着那个地图代码（例如 5），并且永远不会自动重置。所以
+; `IF CFLAG:N:约会中` 实际上是 `IF 5` = 首次约会后恒为真。
 ;
-; The canonical "currently dating" predicate uses CHK_DATENOW (which compares
-; the stored map vs. current MAIN_MAP) AND verifies the partner:
+; 规范的「当前正在约会」判定使用 CHK_DATENOW（它比较存储的地图与
+; 当前 MAIN_MAP），并同时核实对象：
 ;     IF CHK_DATENOW(CFLAG:MASTER:约会中) && FLAG:约会的对象 == TARGET
 ;
-; Anti-pattern (always-true after first date):
-;     IF CFLAG:TARGET:约会中               ;DON'T DO THIS
-CHK_FOCUS(start, current, end)             ; range check
-MASTER_POSE(role, ?, ?)                    ; multi-person scene id lookup
+; 反模式（首次约会后恒为真）：
+;     IF CFLAG:TARGET:约会中               ;不要这样做
+CHK_FOCUS(start, current, end)             ; 区间检查
+MASTER_POSE(role, ?, ?)                    ; 多人场景 id 查表
 ALCOHOL_TASTE(TFLAG:194), ALCOHOL_FACE()
 ESTRUS_CYCLE(N)
 SYNCED_ORGASM(N)
 TIME_PROGRESS(TFLAG:<key>)
-NEMUKE()                                   ; sleepiness
+NEMUKE()                                   ; 困倦度
 CHARA_HOLIDAY(N)
 GET_SUCCESS_RATE()
 GETDEFCOLOR()
 ```
 
-### 5.6 Quest / gift / diary helpers
+### 5.6 任务 / 礼物 / 日记 helper
 
 ```erb
 IRAI_ID_TO_CLIENT(IRAI_ID)
@@ -112,38 +112,37 @@ GET_GIFTDATA(item_id, "得点")
 CHARA_DIARY_PAGESETTING(char, page)
 ```
 
-### 5.6.1 Convenience text + EXP
+### 5.6.1 便捷文本 + EXP
 
 ```erb
-%TEXTR("A/B/C")%                           ; inline random-text variant (use inside PRINTFORM*)
-%TEXTR("A/B/C/")%                          ; trailing slash adds an empty-string option
-CALL HPH_PRINT(@"text with HPH ♥", "L")    ; print text where HPH expands to a pink heart; mode "L"/"W"/"D" sets wait
-CALL AddEXP("<exp-slot>", <char>, <delta>) ; equivalent to `EXP:<char>:<slot> += <delta>` + auto yellow-color "X +N (callname)" message
+%TEXTR("A/B/C")%                           ; 内联随机文本变体（在 PRINTFORM* 内使用）
+%TEXTR("A/B/C/")%                          ; 结尾斜杠会额外加一个空字符串选项
+CALL HPH_PRINT(@"text with HPH ♥", "L")    ; 打印文本，其中 HPH 展开为粉色爱心；模式 "L"/"W"/"D" 设定等待
+CALL AddEXP("<exp-slot>", <char>, <delta>) ; 等价于 `EXP:<char>:<slot> += <delta>` + 自动黄色 "X +N (callname)" 消息
 ```
 
-Use `AddEXP` instead of manually `EXP:N:slot += K / SETCOLOR / PRINTFORMW / RESETCOLOR` — shorter and cannot misspell the yellow color constant.
+用 `AddEXP` 代替手动 `EXP:N:slot += K / SETCOLOR / PRINTFORMW / RESETCOLOR`——更短，且不会拼错那个黄色颜色常量。
 
-`TEXTR` is lighter-weight than `SELECTCASE RAND:N` when each alternative is a single short phrase. Reserve SELECTCASE for branches with multiple lines or side-effects.
+当每个备选项都是单条短语时，`TEXTR` 比 `SELECTCASE RAND:N` 更轻量。把 SELECTCASE 留给带多行或带副作用的分支。
 
-### 5.7 Author-helper conventions
+### 5.7 作者 helper 约定
 
-If you write a function library, use these naming idioms (mirroring the Eiki K30 originals):
+如果你要写一个函数库，请使用以下命名习惯（对齐 Eiki K30 的原版）：
 
 ```erb
-@K{id}_FIND_LOVER()      #FUNCTION   ; -1=this char, 0=none, 1=elsewhere, 2=in-room
-@K{id}_FIND_AROUND(ARG = 0)  #FUNCTION  ; nearest known char id
+@K{id}_FIND_LOVER()      #FUNCTION   ; -1=本角色, 0=无, 1=在别处, 2=在房间内
+@K{id}_FIND_AROUND(ARG = 0)  #FUNCTION  ; 最近的已知角色 id
 @K{id}_DRUNK()           #FUNCTION   ; 0..3
 @K{id}_BOKKI()           #FUNCTION   ; 0..3
 @K{id}_BE_SEEN()         #FUNCTION   ; 0/1
-@K{id}_C_NAME(ARG, TYPE = 0)  #FUNCTIONS  ; how this char calls another
-@K{id}_GREETING()        #FUNCTIONS  ; time-of-day greeting
-@K{id}_AENAI                          ; "days since seen" intro line
-@K{id}_KOUSAI                         ; anniversary
-@K{id}_NURESUKE()                     ; wetness/transparency
-@K{id}_AMANURE                        ; rain trigger
-@K{id}_ROOM_DESCRIPTION()             ; room description
-@K{id}_SET_C_NAME(ARG)                ; interactive nickname dialog
+@K{id}_C_NAME(ARG, TYPE = 0)  #FUNCTIONS  ; 本角色如何称呼另一角色
+@K{id}_GREETING()        #FUNCTIONS  ; 按时段的问候
+@K{id}_AENAI                          ; 「距上次相见多少天」的开场白
+@K{id}_KOUSAI                         ; 纪念日
+@K{id}_NURESUKE()                     ; 湿润度/透明度
+@K{id}_AMANURE                        ; 下雨触发
+@K{id}_ROOM_DESCRIPTION()             ; 房间描述
+@K{id}_SET_C_NAME(ARG)                ; 交互式昵称对话
 ```
 
 ---
-

@@ -1,103 +1,103 @@
-# 11 — Autotest pipeline (semi-automated kojo testing)
+# 11 — 自动测试流水线（半自动口上测试）
 
-> **STATUS: VALIDATED end-to-end on Luna Child K6 (2026-07).**
-> Confirmed working: clip_tap capture; the state-injecting battery (incl. 好感度/心情 layering — the harness must zero those or high real values shadow lower tiers); `[[TID BEGIN/OK]]` markers + `at_update.ps1`; the **marker-based manual test** (`[[MT TID]]`, §11.8) with `manual_scan.ps1`; the **one-click launcher** `run_eratw_test.bat` (§11.12); BOM/lazy-cache handling.
+> **状态：已在露娜·柴尔德 K6 上端到端验证通过（2026-07）。**
+> 确认可用：clip_tap 抓取；注入状态的测试套件（含 好感度/心情 分层——测试台必须把它们清零，否则真实的高值会盖住低档位）；`[[TID BEGIN/OK]]` 标记 + `at_update.ps1`；**基于标记的手动测试**（`[[MT TID]]`，§11.8）配 `manual_scan.ps1`；**一键启动器** `run_eratw_test.bat`（§11.12）；BOM/惰性缓存处理。
 >
-> ### ⭐ CURRENT AUTHORITATIVE CONVENTIONS (supersede any stale detail below)
-> These are the tested, current design. Where §11.3 etc. say otherwise (DEBUGGERR fire-when-0, `TCVAR:{id}:399`), that is **superseded** — kept only as background.
+> ### ⭐ 当前权威约定（凡与下文旧细节冲突，以此为准）
+> 以下是经过测试的当前设计。凡 §11.3 等处另有说法（DEBUGGERR 为 0 时触发、`TCVAR:{id}:399`）的，均已**被取代**——仅作背景保留。
 >
-> 1. **Guard = a single persistent three-state "arm" flag `CFLAG:{id}:1099`** (NOT `DEBUGGERR` — dev builds default it to 0 too, and it gates other game debug; NOT `TCVAR`, which clears daily). States: **0** = never armed (default; real players are always 0 → **never fires**, safe) · **1** = armed (only a debug command sets it) → fires once, battery sets it **2** · **2** = already ran (CFLAG is persistent, survives day-change) → won't re-fire. Hook: `IF CFLAG:{id}:1099 == 1 / CALL …AUTOTEST / RETURN 1 / ENDIF`. Arm/re-arm from the debug console: `CFLAG:{id}:1099 = 1`. Why default-0-never-fires beats DEBUGGERR: safety is intrinsic, not dependent on an external switch.
-> 2. **Deterministic testing of RAND/candidate-pool dialogue** (e.g. 会話 300 down-compat pool): a plain `CALL …_300_1` just RANDs a line, so the harness can't hit a *specific* line. Add a **force-line hook `CFLAG:{id}:1098`**: when `>0`, the dialogue body skips all RAND and plays exactly that line-code. The harness sets `CFLAG:{id}:1098 = <code>` before each `CALL`, giving one deterministic `[[TID]]` per line (and the TIDs then match the `;@AT` tags 1:1 — no orphans). Reset `CFLAG:{id}:1098 = 0` after. Save/restore it like any mutated slot. (`CFLAG:1000–1999` is the 口上用確保領域 reserved kojo range — 1098/1099 are safe free slots.)
-> 3. **Clipboard capture loss is mostly a config problem, not a timing one.** The real culprit for a dropped `[[TID … OK]]` at a screen boundary is `emuera.config` line **`画面のリフレッシュ時にクリップボードとバッファを消去する:YES`** — it wipes the clipboard+buffer on every screen refresh, so a marker printed right at a refresh vanishes before clip_tap polls it. **Set it to `NO`.** Also raise `総バッファサイズ` (default 300) to ≥1000 so a full run doesn't scroll off, keep `クリップボードに貼り付ける行数:500` / `更新間隔:200`. A residual single lost line is still possible → judge pass/fail by reading the actual dialogue text, never by OK-marker presence alone.
-> 4. **Any child-`powershell` call that carries CJK + quotes must use `-EncodedCommand` (Base64/UTF-16LE), never `-Command "<string>"`.** `-Command` lets the command-line parser eat the embedded double-quotes → the child treats the Chinese as a command name and errors, and the error text can get captured as if it were the return value (this broke the folder-picker `P` option). `$enc=[Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($code)); powershell -STA -NoProfile -EncodedCommand $enc`.
+> 1. **守卫 = 单个持久的三态「arm（待命）」标志 `CFLAG:{id}:1099`**（不是 `DEBUGGERR`——开发版也默认把它设为 0，且它还门控游戏其他调试；也不是 `TCVAR`，那个每天会清空）。三态：**0** = 从未待命（默认；真实玩家永远是 0 → **永不触发**，安全）· **1** = 已待命（只有调试命令会设它）→ 触发一次后，测试套件把它设为 **2** · **2** = 已运行过（CFLAG 持久，跨天存活）→ 不会重复触发。挂钩：`IF CFLAG:{id}:1099 == 1 / CALL …AUTOTEST / RETURN 1 / ENDIF`。从调试控制台待命/重新待命：`CFLAG:{id}:1099 = 1`。为什么「默认 0 永不触发」优于 DEBUGGERR：安全性是内在的，不依赖外部开关。
+> 2. **对 RAND/候选池对话（例如 会話 300 的向下兼容池）做确定性测试**：一句普通的 `CALL …_300_1` 只会 RAND 出一行，测试台无法命中*某一具体行*。加一个**强制台词位挂钩 `CFLAG:{id}:1098`**：当其 `>0` 时，对话主体跳过所有 RAND，精确播放该行代码对应的台词。测试台在每次 `CALL` 前设置 `CFLAG:{id}:1098 = <code>`，从而每行得到一个确定性的 `[[TID]]`（这样 TID 就与 `;@AT` 标签 1:1 对应——没有孤儿）。之后重置 `CFLAG:{id}:1098 = 0`。像对待任何被改动的槽位一样保存/还原它。（`CFLAG:1000–1999` 是 口上用確保領域 保留口上区间——1098/1099 是安全的空闲槽位。）
+> 3. **剪贴板抓取丢失多半是配置问题，而非时序问题。** 屏幕边界处丢掉 `[[TID … OK]]` 的真正元凶是 `emuera.config` 中的一行 **`画面のリフレッシュ時にクリップボードとバッファを消去する:YES`**——它在每次屏幕刷新时清空剪贴板+缓冲区，于是恰好在刷新时打印的标记会在 clip_tap 轮询到它之前消失。**把它设为 `NO`。** 另外把 `総バッファサイズ`（默认 300）调到 ≥1000，这样整轮跑下来不会滚出去，保持 `クリップボードに貼り付ける行数:500` / `更新間隔:200`。仍可能残留丢一行 → 通过读实际对话文本来判定 通过/失败，绝不能仅凭 OK 标记是否存在来判断。
+> 4. **任何携带 CJK + 引号的子 `powershell` 调用都必须用 `-EncodedCommand`（Base64/UTF-16LE），绝不能用 `-Command "<string>"`。** `-Command` 会让命令行解析器吃掉内嵌的双引号 → 子进程把中文当成命令名而报错，而错误文本可能被当作返回值捕获（这曾搞坏文件夹选择器的 `P` 选项）。`$enc=[Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($code)); powershell -STA -NoProfile -EncodedCommand $enc`。
 >
-> 5. **Every `[[MT]]` manual-test marker is guarded by ONE per-character switch `@K{id}_MT_ON()`** — a `#FUNCTION` in the kojo's function-library file that `RETURNF 1` during dev/test and `RETURNF 0` before release. Each marker is written as a two-line pair: `SIF K{id}_MT_ON()` immediately above `PRINTL [[MT <TID>]]`. Dev = markers print → cliplog captures them; release = **flip that one function to `0`** and every marker across every file goes silent, so players never see `[[MT …]]`. This decouples "marker present in source" from "marker visible to players": a hard-to-reach-but-safe branch can **ship with its marker still in the file**, silenced, instead of forcing you to either test it or delete it. Before release the AI reports how many manual TIDs are still `待手动测试`/`测试失败`, then asks the user whether to (a) flip the switch to `0`, and (b) comment out any *dangerous* still-untested branches. See §11.8. (`manual_scan.ps1 -Apply` is guard-aware: when it deletes a passed `PRINTL [[MT]]` line it also removes the `SIF K{id}_MT_ON()` line directly above it, so no orphan guard is left swallowing the next real line.)
+> 5. **每个 `[[MT]]` 手动测试标记都由唯一的每角色开关 `@K{id}_MT_ON()` 守护**——它是口上函数库文件里的一个 `#FUNCTION`，开发/测试期 `RETURNF 1`，发布前 `RETURNF 0`。每个标记写成两行一对：`SIF K{id}_MT_ON()` 紧贴在 `PRINTL [[MT <TID>]]` 上方。开发期 = 标记打印 → cliplog 抓到它们；发布期 = **把这个唯一的函数翻成 `0`**，于是每个文件里的每个标记一齐静默，玩家永远看不到 `[[MT …]]`。这把「标记存在于源码」和「标记对玩家可见」解耦了：一个难以到达但安全的分支可以**带着标记原样出货**（静默），而不必强迫你要么测它、要么删它。发布前 AI 汇报还有多少手动 TID 仍为 `待手动测试`/`测试失败`，然后询问用户是否 (a) 把开关翻成 `0`，以及 (b) 注释掉任何*危险*且仍未测的分支。见 §11.8。（`manual_scan.ps1 -Apply` 是守卫感知的：当它删除一条已通过的 `PRINTL [[MT]]` 行时，也会把其正上方的 `SIF K{id}_MT_ON()` 行一并删除，这样不会留下孤儿守卫吞掉下一行真台词。）
 >
-> **Older correction still valid:** manual-test coverage is marker-based (`[[MT <TID>]]` + grep), not signature-matching.
+> **旧的更正仍然有效：** 手动测试覆盖率是基于标记的（`[[MT <TID>]]` + grep），不是签名匹配。
 >
-> **Battery coverage is NOT automatic — cross-check & prune (§11.13).** "Autotest all-green" only proves the branches the battery *actually exercises*. A branch tagged `;@AT 待自动测试` is a **promise the AI made while writing**, not proof it's wired into `@M_KOJO_K{id}_AUTOTEST`. These drift apart (front/back inconsistency). During testing the AI must diff the two sets and add missing branches; and it may **de-register** already-passed branches from the battery to keep it lean — that pruning is the **AI's job, not the launcher's**.
+> **测试套件覆盖率不是自动的——要交叉核对并修剪（§11.13）。** 「自动测试全绿」只证明了测试套件*实际执行*到的那些分支。一个标了 `;@AT 待自动测试` 的分支只是 **AI 在写作时许下的承诺**，而非它已被接入 `@M_KOJO_K{id}_AUTOTEST` 的证据。这两者会逐渐脱节（前后不一致）。测试期间 AI 必须对这两个集合做差集并补上缺失的分支；并且它可以把已通过的分支从测试套件中**注销**以保持精简——这项修剪是 **AI 的活，不是启动器的活**。
 
-**Mode:** Claude Code only (needs file access + ability to launch the game). Requires the user present to drive in-game GUI (load a save, open the debug console, click through dialogue). This is the advanced counterpart to SKILL.md §3 (paste-the-log debugging): instead of the user hand-triggering each case and pasting logs, you install a small **autotest harness** inside the kojo that exercises many dialogue branches in one action, and you read a **live clipboard transcript** to diagnose.
+**模式：** 仅限 Claude Code（需要文件访问权限 + 启动游戏的能力）。需要用户在场来操作游戏内 GUI（读档、开调试控制台、点击过对话）。这是 SKILL.md §3（粘贴日志调试）的进阶版：不再由用户手动逐个触发每个用例并粘贴日志，而是你在口上内部装一个小型**自动测试测试台**，一个动作即可执行大量对话分支，并读取一份**实时剪贴板抄本**来诊断。
 
-This whole file is *empirically derived* — the "what does NOT work" section below is the map of dead-ends so you don't waste a session re-discovering them.
+整个文件都是*经验推导*出来的——下面的「哪些做法行不通」一节是死胡同地图，让你不必浪费一整个会话重新发现它们。
 
 ---
 
-## 11.1 The pipeline at a glance
+## 11.1 流水线一览
 
-1. Write / edit the kojo.
-2. Tag each dialogue branch with a status flag + a stable test-id (§11.7).
-3. Add a small **autotest battery** label + a **3-line guarded hook** in one command handler (§11.4–11.5). Both live *inside the kojo folder* — no engine/core files are ever edited.
-4. Launch the game (`-Debug`) and start the clipboard transcript tool (§11.6).
-5. The user loads a save, enables the guard, and triggers the hook (talks to the character). The battery runs, dumping delimited output.
-6. Read the transcript; a script (or you) maps results back to source lines and updates the status flags (§11.7).
-7. For branches the battery can't reach, the user plays normally in **integration mode** and the tool marks them as it sees them (§11.8).
-8. **Before delivery: disarm** — comment out / delete the hook and the harness file (§11.4, §11.9). Non-negotiable.
-
----
-
-## 11.2 What does NOT work (ruled out empirically — don't retry)
-
-- **The debug console cannot trigger a harness.** The `-Debug` console accepts variable *assignments* (great for cheating in state) and *expressions*, and can invoke a `#FUNCTION` as an expression — but it **rejects flow control**: `CALL` / `IF` / `GOTO` → `不能使用流程控制类命令`. And a `#FUNCTION` body **cannot contain `CALL`** (`CALL命令中不能使用#FUNCTION(S)`). So the console can set up state but can never call your kojo's procedure labels. The trigger must come from a *real procedure context*.
-- **Event hooks are single-definition in this fork.** `@EVENTFIRST` (new game), `@EVENTLOAD` (after load), `@BEFORETRAIN` (day start) etc. are owned by the base game (`SYSTEM.ERB`, `BEFORETRAIN.ERB`). A *second* definition of the same event function in a kojo file is silently ignored — only the game's runs. (Mods that need a day-start hook inject a flag-guarded `CALL` into the canonical file's `;custom code` section, e.g. `BEFORETRAIN.ERB` — that's editing a core file, which we avoid for tests.)
-- **Lazy loading excludes event-function files.** With `USELAZYLOADING:YES` (the player default), any file containing an event function (`@EVENTLOAD`, `@EVENTFIRST`, …) is *not loaded* at all (`… has event function EVENTFIRST, file excluded`). So an event-hook harness wouldn't even load without `USELAZYLOADING:NO`.
-- **The custom-command button API (`@KOJO_COM_NAME/ABLE/K{id}_{n}`, cmd 270+n) is NOT dispatched by this engine.** Even a correctly-authored slot produces no button (the shipped `即兴合奏` custom command also doesn't appear). Confirmed unsupported on this install — do not build a "run autotest" button.
-
-**Conclusion:** the only reliable, non-invasive trigger is a **guarded hook inside an existing player-selectable command handler** (a plain procedure → `CALL` works; a regular file → loads under lazy loading).
+1. 编写/编辑口上。
+2. 给每个对话分支打上状态标志 + 稳定的 test-id（§11.7）。
+3. 加一个小型**自动测试套件**标签 + 一个**3 行的守卫挂钩**到某个命令处理器里（§11.4–11.5）。两者都*住在口上文件夹内*——绝不编辑任何引擎/核心文件。
+4. 启动游戏（`-Debug`）并启动剪贴板抄本工具（§11.6）。
+5. 用户读档、启用守卫、触发挂钩（与角色对话）。测试套件运行，倾倒带分隔符的输出。
+6. 读抄本；一个脚本（或你）把结果映射回源码行并更新状态标志（§11.7）。
+7. 对于测试套件够不到的分支，用户在**集成模式**下正常游玩，工具会边看边标记它们（§11.8）。
+8. **交付前：解除待命**——注释掉/删除挂钩和测试台文件（§11.4、§11.9）。不可妥协。
 
 ---
 
-## 11.3 `DEBUGGERR` — the guard flag (know what it really is)
+## 11.2 哪些做法行不通（经验排除——别再试）
 
-`DEBUGGERR` is a **game-native `#DIM SAVEDATA` flag** (declared in `ERB\DLC\DLC.ERH`), used by the base game (shop debug, option print, user-command handling, `@IS_DEBUGGERR`). It is **NOT** set by launching with `-Debug` — that only enables the debug *console/menu*. `DEBUGGERR` is toggled manually via the in-game **幻想乡之主 debug menu** (`DLCCHIOSEMENU.ERB`) or by typing `DEBUGGERR = 1` / `= 0` in the debug console.
+- **调试控制台无法触发测试台。** `-Debug` 控制台接受变量*赋值*（很适合作弊塞状态）和*表达式*，并能把 `#FUNCTION` 当表达式调用——但它**拒绝流程控制**：`CALL` / `IF` / `GOTO` → `不能使用流程控制类命令`。而且 `#FUNCTION` 主体**不能含 `CALL`**（`CALL命令中不能使用#FUNCTION(S)`）。所以控制台能布置状态，但永远无法调用你口上的过程标签。触发必须来自一个*真实的过程上下文*。
+- **本分支里事件挂钩是单一定义的。** `@EVENTFIRST`（新游戏）、`@EVENTLOAD`（读档后）、`@BEFORETRAIN`（每日开始）等由基础游戏拥有（`SYSTEM.ERB`、`BEFORETRAIN.ERB`）。在口上文件里对同一事件函数做*第二次*定义会被静默忽略——只有游戏那份会跑。（需要每日开始挂钩的 mod 会往规范文件的 `;custom code` 段注入一个带标志守卫的 `CALL`，例如 `BEFORETRAIN.ERB`——那是编辑核心文件，测试中我们避免这么做。）
+- **惰性加载会排除事件函数文件。** 在 `USELAZYLOADING:YES`（玩家默认）下，任何含事件函数（`@EVENTLOAD`、`@EVENTFIRST`、…）的文件*根本不会加载*（`… has event function EVENTFIRST, file excluded`）。所以事件挂钩型测试台在 `USELAZYLOADING:NO` 之前根本不会加载。
+- **自定义命令按钮 API（`@KOJO_COM_NAME/ABLE/K{id}_{n}`，命令 270+n）不被本引擎分发。** 即使正确编写的槽位也不产生按钮（随游戏发货的 `即兴合奏` 自定义命令也不出现）。已确认在本安装上不受支持——不要造「运行自动测试」按钮。
 
-Because it's a *shared* flag, toggling it also flips the game's other debug behaviors. If you'd rather keep the test fully isolated, declare **your own** dedicated flag instead (e.g. a private `CFLAG:{id}:` slot or a `#DIM SAVEDATA AUTOTEST_ARMED`) and guard on that — cleaner, but one more thing the user sets. Either way the guard logic below is identical.
+**结论：** 唯一可靠、非侵入的触发是**在某个既有的、玩家可选的命令处理器内放一个带守卫的挂钩**（普通过程 → `CALL` 有效；普通文件 → 在惰性加载下会加载）。
 
 ---
 
-## 11.4 The trigger hook (fires the battery)
+## 11.3 `DEBUGGERR` — 守卫标志（搞清它到底是什么）
 
-Add these lines at the very top of one command handler the character actually has — 会話 (`@M_KOJO_MESSAGE_COM_K{id}_300`) is the natural choice:
+`DEBUGGERR` 是一个**游戏原生的 `#DIM SAVEDATA` 标志**（在 `ERB\DLC\DLC.ERH` 中声明），被基础游戏使用（商店调试、选项打印、用户命令处理、`@IS_DEBUGGERR`）。它**不是**由 `-Debug` 启动设置的——那只启用调试*控制台/菜单*。`DEBUGGERR` 通过游戏内的 **幻想乡之主 调试菜单**（`DLCCHIOSEMENU.ERB`）手动切换，或在调试控制台里输入 `DEBUGGERR = 1` / `= 0`。
+
+因为它是*共享*标志，切换它也会翻转游戏其他调试行为。若你想让测试完全隔离，就声明**你自己**的专用标志（例如一个私有的 `CFLAG:{id}:` 槽位，或一个 `#DIM SAVEDATA AUTOTEST_ARMED`）并对它守卫——更干净，但用户要多设一样东西。无论哪种，下面的守卫逻辑都一样。
+
+---
+
+## 11.4 触发挂钩（点燃测试套件）
+
+在角色确实拥有的某个命令处理器最顶端加这几行——会話（`@M_KOJO_MESSAGE_COM_K{id}_300`）是自然之选：
 
 ```erb
 @M_KOJO_MESSAGE_COM_K{id}_300
-;=== AUTOTEST hook (TEMP — DELETE before delivery) ===
+;=== AUTOTEST 挂钩（临时——交付前删除）===
 IF !DEBUGGERR
 	CALL M_KOJO_K{id}_AUTOTEST
 	RETURN 1
 ENDIF
-;=== end AUTOTEST hook ===
+;=== AUTOTEST 挂钩结束 ===
 CALL TRAIN_MESSAGE
 CALL M_KOJO_MESSAGE_COM_K{id}_300_1
 RETURN RESULT
 ```
 
-**Direction chosen for this project (SUPERSEDED — see the ⭐ callout at the top):** the guard is now the three-state arm flag `CFLAG:{id}:1099` (`==1` fires, battery sets `2`; arm with `CFLAG:{id}:1099 = 1`). The old "fire when `DEBUGGERR == 0`, set `1`" scheme was dropped because dev builds default `DEBUGGERR` to 0 (so it would fire for a player once they toggled debug) and because zeroing `DEBUGGERR` disables the game's other debug output. Do not reuse `DEBUGGERR` as the guard.
+**本项目选定的方向（已被取代——见顶部的 ⭐ 提示框）：** 守卫现在是三态待命标志 `CFLAG:{id}:1099`（`==1` 触发，测试套件设为 `2`；用 `CFLAG:{id}:1099 = 1` 待命）。旧的「`DEBUGGERR == 0` 时触发、设为 `1`」方案被弃用了，因为开发版把 `DEBUGGERR` 默认为 0（所以玩家一旦开了调试它就会触发一次），也因为把 `DEBUGGERR` 清零会禁用游戏其他调试输出。不要复用 `DEBUGGERR` 作守卫。
 
-> ⚠️ **This is "default-armed": `0` is also the normal *player* state.** If this hook ships in a delivered kojo, a player's first 会話 will trigger the whole test dump. Therefore **disarming before delivery is mandatory** (§11.9), and the surest disarm is to *comment out the hook + delete the harness file* — not merely setting the flag (a player's save is at `0`). If you prefer safe-by-default, invert to `IF DEBUGGERR` (fires only when the user deliberately enables debug) and drop the reset; the tradeoff is one console keystroke to arm.
+> ⚠️ **这是「默认待命」：`0` 也是正常的*玩家*状态。** 如果这个挂钩出现在交付的口上里，玩家第一次 会話 就会触发整个测试倾倒。因此**交付前解除待命是强制的**（§11.9），最稳的解除方式是*注释掉挂钩 + 删除测试台文件*——而不仅仅是设标志（玩家存档处于 `0`）。若你偏好默认安全，就反转成 `IF DEBUGGERR`（仅当用户刻意开启调试时才触发）并去掉重置；代价是需要在控制台敲一下键来待命。
 
 ---
 
-## 11.5 The battery (`@M_KOJO_K{id}_AUTOTEST`)
+## 11.5 测试套件（`@M_KOJO_K{id}_AUTOTEST`）
 
-A single temporary label, in its own file `M_KOJO_K{id}_AUTOTEST.ERB` inside the kojo folder. It:
+一个临时标签，独占口上文件夹内自己的文件 `M_KOJO_K{id}_AUTOTEST.ERB`。它：
 
-1. **Saves** every state slot it will mutate into a local array.
-2. **Sets up state internally** — all the "cheats" as plain ERB assignments, so the user types nothing in the console.
-3. **CALLs the dialogue bodies** across each relationship tier / condition, bracketed by ASCII markers + test-ids.
-4. **Restores** every saved slot.
-5. **Resets the guard** (`DEBUGGERR = 1`) so it fires once per enable.
+1. 把每个将被改动的状态槽位**保存**进一个局部数组。
+2. **在内部布置状态**——所有「作弊」都作为普通 ERB 赋值，用户不必在控制台输入任何东西。
+3. 跨每个关系档位/条件**CALL 对话主体**，用 ASCII 标记 + test-id 括起来。
+4. **还原**每个保存的槽位。
+5. **重置守卫**（`DEBUGGERR = 1`）使其每次启用只触发一次。
 
 ```erb
 ;============================================================
-;AUTOTEST harness for K{id} — TEMPORARY. DELETE before delivery.
-;Triggered by the DEBUGGERR-guarded hook in the 会話 handler.
-;Sets state internally (no console typing), CALLs bodies across
-;tiers, prints delimiter + [[TID]] markers, restores state.
+;K{id} 的 AUTOTEST 测试台——临时。交付前删除。
+;由 会話 处理器里 DEBUGGERR 守卫的挂钩触发。
+;在内部设状态（无需控制台输入），跨档位 CALL 主体，
+;打印分隔符 + [[TID]] 标记，还原状态。
 ;============================================================
 @M_KOJO_K{id}_AUTOTEST
 #DIM sav, 16
-;--- save mutated slots ---
+;--- 保存被改动的槽位 ---
 sav:0 = TALENT:{id}:恋人
 sav:1 = TALENT:{id}:愛欲
 sav:2 = TALENT:{id}:炮友
@@ -112,7 +112,7 @@ FLAG:時間停止 = 0
 
 PRINTL =====AUTOTEST_K{id}_BEGIN=====
 
-;--- one tier, one bracketed CALL ---
+;--- 一个档位，一次括起的 CALL ---
 PRINTL [[TID K{id}_300_neutral BEGIN]]
 CALL AT_CLEAR_TIERS_K{id}
 CALL M_KOJO_MESSAGE_COM_K{id}_300_1
@@ -123,9 +123,9 @@ CALL AT_CLEAR_TIERS_K{id}
 TALENT:{id}:恋人 = 1
 CALL M_KOJO_MESSAGE_COM_K{id}_300_1
 PRINTL [[TID K{id}_300_恋人 OK]]
-; … repeat per tier / per command …
+; … 每个档位/每个命令重复 …
 
-;--- restore ---
+;--- 还原 ---
 TALENT:{id}:恋人 = sav:0
 TALENT:{id}:愛欲 = sav:1
 TALENT:{id}:炮友 = sav:2
@@ -133,13 +133,13 @@ TALENT:{id}:恋慕 = sav:3
 TALENT:{id}:思慕 = sav:4
 CFLAG:{id}:面識 = sav:5
 FLAG:時間停止 = sav:6
-DEBUGGERR = 1              ; fire once per enable
+DEBUGGERR = 1              ; 每次启用触发一次
 
 PRINTL =====AUTOTEST_K{id}_END=====
 PRINTW [AUTOTEST] done — state restored — click to return
 RETURN 1
 
-;--- helper: zero all relationship tiers ---
+;--- 辅助：把所有关系档位清零 ---
 @AT_CLEAR_TIERS_K{id}
 TALENT:{id}:恋人 = 0
 TALENT:{id}:愛欲 = 0
@@ -149,79 +149,79 @@ TALENT:{id}:思慕 = 0
 RETURN 1
 ```
 
-**Rules that make the battery correct:**
+**让测试套件正确的规则：**
 
-- **CALL the `_1` body directly** (`@M_KOJO_MESSAGE_COM_K{id}_300_1`), *not* the wrapper `_300` — the wrapper `CALL`s `TRAIN_MESSAGE` (advances/consumes a turn) and would recurse into the hook. The `_1` body is pure dialogue.
-- **Verify every label and slot name against the actual kojo before writing** — a wrong `CALL` target or a non-existent slot *halts* the whole battery. (This is also how the battery catches the kojo's own mistakes: a bad label → halt → that branch is `测试失败`.)
-- **Each dialogue branch already ends in `PRINTFORMW`**, so the screen holds at each step and the transcript captures every chunk. You usually don't need to add your own waits.
-- **Save→mutate→restore is mandatory** so the loaded save isn't left altered. Running the test also consumes one in-game turn via the command — harmless as long as the user doesn't save; still, always work from a backed-up save.
-- **State-injection slots** (verified working as plain assignments): `CFLAG:{id}:好感度`, `CFLAG:{id}:面識`, `ABL:{id}:親密`, `ABL:{id}:従順`, `TALENT:{id}:恋慕/恋人/愛欲/炮友/思慕`, `TCVAR:{id}:発情`, `FLAG:時間停止` (=`FLAG:70`), `MONEY`. (No per-character `信頼`/trust slot exists in this fork — use 好感度/親密/従順.)
+- **直接 CALL `_1` 主体**（`@M_KOJO_MESSAGE_COM_K{id}_300_1`），*而不是*包装器 `_300`——包装器会 `CALL` `TRAIN_MESSAGE`（推进/消耗一回合）并会递归进挂钩。`_1` 主体是纯对话。
+- **写之前，对照实际口上核验每一个标签和槽位名**——错误的 `CALL` 目标或不存在的槽位会*中止*整个测试套件。（这也是测试套件抓出口上自身错误的方式：坏标签 → 中止 → 该分支即 `测试失败`。）
+- **每个对话分支已经以 `PRINTFORMW` 结尾**，所以屏幕会在每一步停住，抄本能抓到每个片段。你通常不需要自己加等待。
+- **保存→改动→还原是强制的**，这样载入的存档不会被留下改动。运行测试也会通过该命令消耗一个游戏内回合——只要用户不存档就无害；不过，务必从备份存档开工。
+- **状态注入槽位**（已验证可作为普通赋值使用）：`CFLAG:{id}:好感度`、`CFLAG:{id}:面識`、`ABL:{id}:親密`、`ABL:{id}:従順`、`TALENT:{id}:恋慕/恋人/愛欲/炮友/思慕`、`TCVAR:{id}:発情`、`FLAG:時間停止`（=`FLAG:70`）、`MONEY`。（本分支里不存在每角色的 `信頼`/信任 槽位——用 好感度/親密/従順。）
 
 ---
 
-## 11.6 Capture — the clipboard transcript (`tools/clip_tap.ps1`)
+## 11.6 抓取 — 剪贴板抄本（`tools/clip_tap.ps1`）
 
-Emuera auto-copies newly-displayed text to the Windows clipboard (config `表示したテキストをクリップボードにコピーする:YES`, `新しい行のみコピーする:YES`). `tools/clip_tap.ps1` polls the clipboard and appends every change to a log file — a **live transcript** you can `Read`.
+Emuera 会把新显示的文本自动复制到 Windows 剪贴板（配置 `表示したテキストをクリップボードにコピーする:YES`、`新しい行のみコピーする:YES`）。`tools/clip_tap.ps1` 轮询剪贴板，把每次变化追加到日志文件——一份你可以 `Read` 的**实时抄本**。
 
-- **Single-instance guarded** (named mutex): a second copy exits immediately. If you ever see duplicated, same-timestamp blocks, a stray instance is running — kill all `clip_tap.ps1` processes (excluding your own shell) and relaunch one.
-- **Read with `-Encoding UTF8`.** ASCII markers (`=====`, `[[TID …]]`) are safe to grep; CJK needs the encoding flag.
-- **`emuera.log` is halt-only** — written on compile error / runtime halt, *not* rewritten on a clean run. Never read it as a "success" signal; use the transcript. Clear it before each launch so a stale error doesn't mislead you.
-- Static screens copy nothing — the transcript only grows when new text prints (i.e. as the user clicks through).
+- **单实例守卫**（命名互斥锁）：第二份副本立即退出。若你看到重复的、同时间戳的块，说明有一个游离实例在跑——杀掉所有 `clip_tap.ps1` 进程（不含你自己的 shell）并重启一个。
+- **用 `-Encoding UTF8` 读。** ASCII 标记（`=====`、`[[TID …]]`）可以放心 grep；CJK 需要编码标志。
+- **`emuera.log` 是仅在中止时写的**——在编译错误/运行时中止时写入，*干净运行时不会重写*。绝不能把它当「成功」信号来读；用抄本。每次启动前清掉它，免得旧错误误导你。
+- 静态屏幕不复制任何东西——抄本只在有新文本打印时（即用户点击过时）才增长。
 
-Typical launch (Claude Code side; the user does the in-game steps):
+典型启动（Claude Code 侧；游戏内步骤由用户做）：
 
 ```powershell
 cd "<game root>"
-Remove-Item lazyloading.dat,emuera.log,<log>.txt -ErrorAction SilentlyContinue   # clear stale cache+log
+Remove-Item lazyloading.dat,emuera.log,<log>.txt -ErrorAction SilentlyContinue   # 清掉旧缓存+日志
 $p = Start-Process ".\Emuera_lazyloading_for_developer.exe" -ArgumentList "-Debug" -PassThru
 Start-Process powershell -WindowStyle Hidden -ArgumentList @(
   "-STA","-ExecutionPolicy","Bypass","-File",".\learning\eratw-skill\tools\clip_tap.ps1",
   "-LogFile",".\<log>.txt","-WatchPid",$p.Id,"-IntervalMs","300")
 ```
 
-`clip_tap.ps1` stops when the watched game PID exits (or via `-StopFile` / `-MaxSeconds`).
+`clip_tap.ps1` 在被监视的游戏 PID 退出时停止（或经由 `-StopFile` / `-MaxSeconds`）。
 
-> ### ⚠️ `lazyloading.dat` — delete it after adding ANY new label (root cause of "my new command/derived kojo does nothing in-game")
-> `lazyloading.dat` is the engine's **symbol index**: "label X lives in file Y". With `USELAZYLOADING:YES` (player default) the engine consults this cache to lazy-load only the files it needs. The trap that bites hardest:
-> - **A NEWLY-ADDED label** (a new `@M_KOJO_MESSAGE_COM_K{id}_NNN`, a new `_SCOM_`, a new event handler) is **not in the stale index** → the engine believes it doesn't exist → `TRYCALLFORM` silently falls through to the engine's generic narration. The player sees the **command's default text but none of your kojo lines** — exactly the "banner shows, my dialogue doesn't" symptom.
-> - **An EDIT to an EXISTING label's body** usually DOES take effect (the label is already indexed, so when the file lazy-loads the engine reads the current bytes). This asymmetry is why you can see a diary's *rewritten text* fine while a *newly-added* 304/掏耳朵 label appears dead — and it makes the bug very confusing if you don't know the rule.
-> **Fix: delete `lazyloading.dat` before launching whenever you added labels this session.** The engine rebuilds it (full scan) on next start. The launcher (`start_pipeline.ps1`) now deletes it automatically on every run; a *manual* exe launch does not, so delete it by hand. Symptom-first rule of thumb: **new label + "does nothing in game" + no compile error ⇒ stale `lazyloading.dat` first, before you touch the code.**
+> ### ⚠️ `lazyloading.dat` — 加了任何新标签后就删掉它（「我的新命令/派生口上在游戏里没反应」的根因）
+> `lazyloading.dat` 是引擎的**符号索引**：「标签 X 住在文件 Y」。在 `USELAZYLOADING:YES`（玩家默认）下，引擎查这个缓存来只惰性加载它需要的文件。最坑的陷阱：
+> - **一个新加的标签**（新的 `@M_KOJO_MESSAGE_COM_K{id}_NNN`、新的 `_SCOM_`、新的事件处理器）**不在陈旧索引里** → 引擎认为它不存在 → `TRYCALLFORM` 静默地落穿到引擎的通用旁白。玩家看到**命令的默认文本却没有你的任何口上台词**——正是「横幅出现了、我的对话没出现」的症状。
+> - **对一个既有标签主体的编辑**通常*确实*生效（标签已被索引，所以文件惰性加载时引擎读的是当前字节）。这种不对称正是为什么你能看到日记*被改写的文本*正常，而*新加的* 304/掏耳朵 标签却像死了——不懂这条规则时这个 bug 非常令人困惑。
+> **修复：只要你这个会话加了标签，启动前就删掉 `lazyloading.dat`。** 引擎下次启动会重建它（全量扫描）。启动器（`start_pipeline.ps1`）现在每次运行都自动删它；而*手动*启动 exe 不会，所以要手动删。症状优先的经验法则：**新标签 + 「游戏里没反应」 + 无编译错误 ⇒ 先怀疑陈旧的 `lazyloading.dat`，再去动代码。**
 
 ---
 
-## 11.7 Status flags + the scriptable test-id convention
+## 11.7 状态标志 + 可脚本化的 test-id 约定
 
-**Per-dialogue status flag** — a single `;`-comment tag on each dialogue branch, in Chinese (minimal, clear):
+**每对话状态标志**——每个对话分支上一条 `;`-注释标签，用中文（极简、清晰）：
 
-| Flag | Meaning |
+| 标志 | 含义 |
 |---|---|
-| `待自动测试` | generated; will be covered by the autotest battery |
-| `待手动测试` | needs real play (events / danmaku / sex-scene / context-driven); the battery can only *smoke-test* it |
-| `测试通过` | passed — by the battery, or seen during integration play |
-| `测试失败` | the battery reached it and the game halted/errored here → needs fixing |
+| `待自动测试` | 已生成；将由自动测试套件覆盖 |
+| `待手动测试` | 需要真实游玩（事件 / 弹幕 / 性场景 / 上下文驱动）；测试套件只能*冒烟测*它 |
+| `测试通过` | 已通过——由测试套件，或在集成游玩中见到 |
+| `测试失败` | 测试套件到达了它但游戏在此中止/报错 → 需要修 |
 
-No separate "smoke" or "random" flag: event labels stay `待手动测试` (the battery smoke-CALLs them only to catch crashes → `测试失败` on halt); RAND branches just accrue `测试通过` line-by-line as each variant actually appears over several runs.
+没有单独的「冒烟」或「随机」标志：事件标签保持 `待手动测试`（测试套件只冒烟 CALL 它们以抓崩溃 → 中止即 `测试失败`）；RAND 分支只是随着每个变体在多轮里实际出现而逐行累积 `测试通过`。
 
-**Whose job is the flag:** the AI classifies `待自动测试` vs `待手动测试` when it *writes* each line. The smoke test is the backstop — an "auto" line that secretly needs context will crash and surface as `测试失败`.
+**标志是谁的活：** AI 在*写*每一行时把它分类为 `待自动测试` 还是 `待手动测试`。冒烟测试是兜底——一条暗地里需要上下文的「auto」行会崩溃并暴露为 `测试失败`。
 
-**Scriptable correlation (so flag updates cost no tokens):**
+**可脚本化的关联（让标志更新不耗 token）：**
 
-- Tag each testable branch in the kojo with a stable id comment: `;@TID K{id}_300_恋人`.
-- The battery brackets each exercised branch: `PRINTL [[TID <id> BEGIN]]` … CALL … `PRINTL [[TID <id> OK]]`.
-- A script reads the transcript and rewrites the `;@AT <status> <id>` line in the source (`tools/at_update.ps1`). Verdict is **END-sentinel gated** so a clipboard-dropped `OK` does not cause a false failure:
-  - **END sentinel (`=====AUTOTEST_K{id}_END=====`) present** → the battery ran to completion, no halt → **every TID that printed a `BEGIN` = `测试通过`**, even if its `OK` was lost at a screen boundary.
-  - **END sentinel absent** → execution halted → the culprit is the block whose `BEGIN` is the **last marker in the log** (nothing ran after it) = `测试失败`; every earlier `BEGIN` has a later marker so it completed = `测试通过`.
-  - **TID absent from log** → leave as-is.
-  - Why not "BEGIN alone = pass": `BEGIN` is printed *before* the `CALL`, so a body that halts still shows its `BEGIN`. The END-sentinel / later-marker check is what actually proves the body ran — that's the one thing the battery exists to verify.
-- **Self-locating:** the battery's first output line is `PRINTL [[KOJODIR <path-relative-to-game-root>]]` (the author hardcodes the path when writing the harness). `at_update.ps1` reads that line and resolves the kojo folder against `-GameRoot`, so it needs **no `-KojoDir`** — pass one only to override. This is how the one-click launcher figures out which folder to edit without asking the user to type a path (it just shows the detected folder for confirmation).
+- 用一条稳定 id 注释给口上里每个可测分支打标：`;@TID K{id}_300_恋人`。
+- 测试套件把每个被执行的分支括起来：`PRINTL [[TID <id> BEGIN]]` … CALL … `PRINTL [[TID <id> OK]]`。
+- 一个脚本读抄本并重写源码里的 `;@AT <status> <id>` 行（`tools/at_update.ps1`）。裁决由 **END 哨兵门控**，这样剪贴板丢掉的 `OK` 不会导致误判失败：
+  - **END 哨兵（`=====AUTOTEST_K{id}_END=====`）存在** → 测试套件跑到完成，无中止 → **每个打印了 `BEGIN` 的 TID = `测试通过`**，即便它的 `OK` 在屏幕边界丢了。
+  - **END 哨兵缺失** → 执行中止 → 元凶是那个 `BEGIN` 为**日志中最后一个标记**（其后什么都没跑）的块 = `测试失败`；每个更早的 `BEGIN` 后面都有更晚的标记，说明它完成了 = `测试通过`。
+  - **TID 在日志中缺席** → 保持原样。
+  - 为什么不用「只有 BEGIN = 通过」：`BEGIN` 是在 `CALL` *之前*打印的，所以一个会中止的主体照样会显示它的 `BEGIN`。END 哨兵/更晚标记检查才真正证明主体跑过了——那正是测试套件存在的唯一要证明的事。
+- **自定位：** 测试套件的第一行输出是 `PRINTL [[KOJODIR <相对游戏根目录的路径>]]`（作者在写测试台时把路径硬编码进去）。`at_update.ps1` 读这行并把口上文件夹相对 `-GameRoot` 解析出来，所以它**不需要 `-KojoDir`**——只有要覆盖时才传一个。这就是一键启动器如何不用用户输路径就搞清要编辑哪个文件夹（它只是把检测到的文件夹展示出来让人确认）。
 
 ---
 
-## 11.8 Manual-test coverage — the `[[MT]]` marker method (replaces signature-matching)
+## 11.8 手动测试覆盖 — `[[MT]]` 标记法（取代签名匹配）
 
-The battery can't reach event/danmaku/約会/context dialogue — those only fire in real play. Instead of trying to *recognise* each line's text in the transcript (fragile: interpolation, RAND, duplicate text), **make each branch announce itself**:
+测试套件够不到 事件/弹幕/約会/上下文 对话——那些只在真实游玩中触发。与其试图在抄本里*识别*每行的文本（脆弱：插值、RAND、重复文本），**不如让每个分支自报家门**：
 
-**At kojo-authoring time**, directly under every `;@AT 待手动测试 <TID>` tag, add a **guarded** machine marker containing the TID — a `SIF K{id}_MT_ON()` line immediately followed by the `PRINTL [[MT <TID>]]` line:
+**在口上编写时**，紧贴在每个 `;@AT 待手动测试 <TID>` 标签下方，加一个**带守卫的**机器标记，其中含 TID——一行 `SIF K{id}_MT_ON()` 紧接一行 `PRINTL [[MT <TID>]]`：
 
 ```erb
 		;@AT 待手动测试 K6_EV1_今日首问候
@@ -232,11 +232,11 @@ The battery can't reach event/danmaku/約会/context dialogue — those only fir
 		...
 ```
 
-- The marker is a plain `PRINTL` so it prints whenever that branch actually runs in-game → it lands in cliplog.
+- 标记是一条普通 `PRINTL`，所以那个分支只要在游戏里实际运行它就会打印 → 落进 cliplog。
 
-#### The `@K{id}_MT_ON()` master switch (guards ALL markers)
+#### `@K{id}_MT_ON()` 主开关（守护所有标记）
 
-Every `[[MT]]` marker is gated by **one** per-character function, defined once in the kojo's function-library file:
+每个 `[[MT]]` 标记都由**唯一**一个每角色函数门控，在口上函数库文件里定义一次：
 
 ```erb
 ;===== 手动测试标记总开关（[[MT]] 守护开关）=====
@@ -247,89 +247,89 @@ Every `[[MT]]` marker is gated by **one** per-character function, defined once i
 RETURNF 1
 ```
 
-Why this matters (it changes the delivery model):
+为什么这很重要（它改变了交付模型）：
 
-- **Dev/test = `1`**: markers print naturally as the player triggers each branch; cliplog captures them; `manual_scan.ps1` counts them.
-- **Release = `0`** (flip the single `RETURNF`): every marker in every file goes silent at once. A player NEVER sees `[[MT …]]`, even for branches that were never tested.
-- **This decouples "marker in source" from "marker visible to players."** Some branches are genuinely hard to reach (rare events, weather/time-gated, R18-gated) but harmless. Previously the only ways to make them player-safe were to test them or delete the marker. Now the user can **ship with the marker still present, just silenced** — useful when they want to publish now and polish later.
-- **Release-time AI flow** (the point of the switch):
-  1. Count TIDs still tagged `;@AT 待手动测试` or `;@AT 测试失败` (these are the untested/failed manual branches) and report them to the user by name.
-  2. Ask: **flip `@K{id}_MT_ON()` to `RETURNF 0`?** (makes all markers player-invisible in one edit).
-  3. Ask whether any *dangerous* still-untested branch should be temporarily `[SKIPSTART]/[SKIPEND]`-commented until it's been verified (safe-but-untested branches can just ride along, silenced).
-  This guarantees the user knows exactly what has and hasn't been exercised before they publish, and the flip is one line, fully reversible.
+- **开发/测试 = `1`**：玩家触发每个分支时标记自然打印；cliplog 抓到它们；`manual_scan.ps1` 数它们。
+- **发布 = `0`**（翻那唯一的 `RETURNF`）：每个文件里的每个标记一齐静默。玩家**永远**看不到 `[[MT …]]`，即便对从未测过的分支也是。
+- **这把「标记在源码里」和「标记对玩家可见」解耦了。** 有些分支确实难以到达（罕见事件、天气/时段门控、R18 门控）但无害。以前让它们对玩家安全的唯一办法是测它们或删标记。现在用户可以**带着标记原样出货、只是静默**——想现在发布、以后再打磨时很有用。
+- **发布时的 AI 流程**（开关的意义所在）：
+  1. 数还标着 `;@AT 待手动测试` 或 `;@AT 测试失败` 的 TID（这些是未测/失败的手动分支）并按名字向用户汇报。
+  2. 询问：**把 `@K{id}_MT_ON()` 翻成 `RETURNF 0`？**（一次编辑让所有标记对玩家不可见）。
+  3. 询问是否要把任何*危险*且仍未测的分支临时用 `[SKIPSTART]/[SKIPEND]` 注释掉，直到它被验证（安全但未测的分支可以就那么带着走、静默）。
+  这保证用户在发布前确切知道什么已经、什么还没被执行过，而这一翻只是一行、完全可逆。
 
-- **`SIF` + `PRINTL` must stay adjacent** (guard line directly above the marker line). `manual_scan.ps1 -Apply` is guard-aware — when a branch passes and its marker line is deleted, the `SIF K{id}_MT_ON()` line right above it is deleted too, so you never get an orphan `SIF` swallowing the following real dialogue line.
-- **TID must start with `K<id>_`** (e.g. `K6_…`) so the char is readable from the marker alone.
-- **Format is load-bearing** — both the tag line and the marker line must be *single-line, exact-format*, because `manual_scan.ps1 -Apply` edits them programmatically. The two canonical single-line forms:
+- **`SIF` + `PRINTL` 必须保持相邻**（守卫行紧贴标记行上方）。`manual_scan.ps1 -Apply` 是守卫感知的——当一个分支通过、它的标记行被删除时，正上方的 `SIF K{id}_MT_ON()` 行也一并删除，这样你永远不会得到一个孤儿 `SIF` 吞掉后面那行真台词。
+- **TID 必须以 `K<id>_` 开头**（例如 `K6_…`），这样光看标记就能读出是哪个角色。
+- **格式是承重的**——标签行和标记行都必须是*单行、精确格式*，因为 `manual_scan.ps1 -Apply` 会以程序方式编辑它们。两种规范单行形式：
   - `<indent>;@AT 待手动测试 <TID>`
   - `<indent>PRINTL [[MT <TID>]]`
-  Anything off-format is skipped (safe), but never split these across lines or reformat them.
+  任何不合格式的都会被跳过（安全），但永远不要把它们拆成多行或重新排版。
 
-**`tools/manual_scan.ps1`** then:
-- **Scan** (default): greps cliplog for every `[[MT <TID>]]`, dedups, reports which branches were triggered (and to which characters, from the `K<id>_` prefix). Optionally `-OutFile` to write the list.
-- **Apply** (`-Apply -KojoDir <dir>`): for each triggered TID, rewrite `;@AT 待手动测试 <TID>` → `;@AT 测试通过 <TID>` **and delete** the `PRINTL [[MT <TID>]]` line **plus the `SIF K{id}_MT_ON()` guard line directly above it** — turning a tested branch back into clean, marker-free source with no orphan guard. UTF-8 BOM + CRLF preserved. (Only exact-format lines are touched; validated surgical.)
+**`tools/manual_scan.ps1`** 随后：
+- **Scan**（默认）：在 cliplog 里 grep 每个 `[[MT <TID>]]`，去重，报告哪些分支被触发（以及从 `K<id>_` 前缀看是对哪些角色）。可选 `-OutFile` 把列表写出来。
+- **Apply**（`-Apply -KojoDir <dir>`）：对每个被触发的 TID，把 `;@AT 待手动测试 <TID>` 重写为 `;@AT 测试通过 <TID>` **并删除** `PRINTL [[MT <TID>]]` 行 **加上其正上方的 `SIF K{id}_MT_ON()` 守卫行**——把一个测过的分支变回干净、无标记的源码，且不留孤儿守卫。UTF-8 BOM + CRLF 保留。（只碰精确格式的行；经过验证的外科式操作。）
 
-A passed branch loses its marker+guard the moment it's confirmed 测试通过. Branches that **remain** untested keep their guarded marker — and that is now **safe to ship** as long as `@K{id}_MT_ON()` is flipped to `RETURNF 0` at release (markers stay in source but never print). So "no `[[MT]]` in source" is no longer a hard delivery gate; "`@K{id}_MT_ON()` returns 0" is. You may still choose to delete all remaining markers for a truly clean release — both are acceptable.
+一个通过的分支在被确认 测试通过 的那一刻就失去它的标记+守卫。**仍**未测的分支保留其带守卫的标记——而这现在**可以安全出货**，只要发布时把 `@K{id}_MT_ON()` 翻成 `RETURNF 0`（标记留在源码里但永不打印）。所以「源码里没有 `[[MT]]`」不再是硬性交付关口；「`@K{id}_MT_ON()` 返回 0」才是。你仍然可以选择删掉所有剩余标记以求真正干净的发布——两种都可接受。
 
-> **Tell the user this (it looks alarming otherwise):** while manual-testing, seeing a line like `[[MT K6_EV1_今日首问候]]` pop up right before a piece of dialogue is **normal and expected** — it's the test marker doing its job, and it will be auto-removed once that dialogue is marked as passed.
+> **要告诉用户这一点（否则看起来会吓人）：** 手动测试时，看到某段对话前弹出一行像 `[[MT K6_EV1_今日首问候]]` 的东西是**正常且预期的**——那是测试标记在尽责，一旦该对话被标为通过它就会被自动移除。
 
 ---
 
-## 11.9 Safety rules — never break the player's game
+## 11.9 安全规则 — 绝不弄坏玩家的游戏
 
 > **两种交付语境别混淆。** 下面的"发布前删脚手架"规则针对**面向玩家发布可游玩的口上**。若某份口上是**随 SKILL 发布的教学范例**（如 `reference-kojo/luna-K6/`），则可以**有意保留** AUTOTEST 测试套件 + `[[MT]]` 标记 + `@K{id}_MT_ON()` 开关，作为方法论的正面示范——但**必须在该口上的 README（或其它 AI 会读到的地方）写明"这是刻意保留的参考、不是没清理干净"**，并说明玩家向发布时应如何清理。别让读者把教学范例里的脚手架误当成必须删的残留。
 
-1. **Disarm before delivery — blocking.** Comment out the 3-line hook *and* delete `M_KOJO_K{id}_AUTOTEST.ERB` before handing the kojo back. With the default-armed (`IF !DEBUGGERR`) design a shipped hook fires for every player. Merely resetting the flag is not enough — remove the code. (The AUTOTEST arm flag `CFLAG:{id}:1099` defaults to 0 = never-fires, so a stray hook is *inert* on a fresh player save, but still remove it.)
-1b. **Silence manual-test markers before delivery — blocking.** Flip `@K{id}_MT_ON()` to `RETURNF 0` (one edit) so no `[[MT …]]` prints for players. Unlike the AUTOTEST hook, guarded markers left in source are harmless *once the switch is 0* — you don't have to delete them. First **report** to the user which manual TIDs are still `待手动测试`/`测试失败` (§11.8), so the flip is an informed decision, not a silent one.
-2. **Back up saves.** Autosave writes `save99.sav`; day-advance and new-game overwrite it. Copy `sav/` before testing, restore after. Verify with a hash if the user is anxious.
-3. **Restore all mutated state** in the battery (save→mutate→restore), and reset any config you changed (e.g. if you ever set `USELAZYLOADING:NO`, restore `YES`).
-4. **Guard everything behind the flag** so normal play is untouched while the harness is present.
-5. **Keep files UTF-8 with BOM.** The battery uses CJK *identifiers* (`TALENT:{id}:恋人`, `FLAG:時間停止`); without BOM they won't match the CSV slot names. `Write`/`Edit` tools strip BOM — re-apply it after every write (see references/10).
+1. **交付前解除待命——阻塞项。** 交回口上前，注释掉那 3 行挂钩*并*删除 `M_KOJO_K{id}_AUTOTEST.ERB`。在默认待命（`IF !DEBUGGERR`）设计下，出货的挂钩会对每个玩家触发。仅仅重置标志不够——移除代码。（AUTOTEST 待命标志 `CFLAG:{id}:1099` 默认为 0 = 永不触发，所以一个游离挂钩在全新玩家存档上是*惰性*的，但仍要移除它。）
+1b. **交付前静默手动测试标记——阻塞项。** 把 `@K{id}_MT_ON()` 翻成 `RETURNF 0`（一次编辑），这样对玩家不打印任何 `[[MT …]]`。与 AUTOTEST 挂钩不同，留在源码里的带守卫标记*一旦开关为 0* 就是无害的——你不必删它们。先向用户**汇报**哪些手动 TID 仍为 `待手动测试`/`测试失败`（§11.8），使这一翻是知情决定，而非悄然为之。
+2. **备份存档。** 自动存档写 `save99.sav`；进日/新游戏会覆盖它。测试前拷贝 `sav/`，测试后还原。用户焦虑的话用哈希核验。
+3. **在测试套件里还原所有被改动的状态**（保存→改动→还原），并重置任何你改过的配置（例如你若曾设 `USELAZYLOADING:NO`，就还原 `YES`）。
+4. **把一切都守卫在标志之后**，这样测试台存在时正常游玩不受影响。
+5. **文件保持 UTF-8 带 BOM。** 测试套件使用 CJK *标识符*（`TALENT:{id}:恋人`、`FLAG:時間停止`）；没有 BOM 它们就匹配不上 CSV 槽位名。`Write`/`Edit` 工具会剥掉 BOM——每次写后重新加上（见 references/10）。
 
 ---
 
-## 11.10 Fidelity + coverage (set expectations honestly)
+## 11.10 保真度 + 覆盖率（诚实设定预期）
 
-- **The battery is a UNIT test of label *bodies*** — it confirms each branch compiles, its guard selects it, and it prints without halting under the state you set. It does **not** test dispatch *timing* (EVENT firing per cell-transition, GRAVITY/MARKCNG over-firing — SKILL §1 pitfalls #4/#5/#7). Those still need real play or reading the dispatch. "Autotest passes" ≠ "correct in play."
-- **RAND branches are non-deterministic:** "pass" means the branch was reached without error, not byte-identical output. Coverage of RAND siblings accrues over several runs.
-- **Rough coverage** (varies by character; event-heavy characters skew lower): ~45–55% of dialogue is cleanly autotestable (daily commands, harassment, diary, encounter/color), ~10% partial (sex/counter/mark/orgasm — need session context), ~40–45% needs real play (the events file + danmaku). Report which is which so the user knows what to cover by hand.
-
----
-
-## 11.11 Division of labor
-
-- **The user drives all in-game GUI**: loads a save, opens the debug console (`调试(D)` → `打开调试窗口` → `控制台`), types the arm command `CFLAG:{id}:1099 = 1`, selects commands, clicks through dialogue.
-- **You (Claude Code) do**: launch the exe, run/read `clip_tap`, read `emuera.log`, edit the kojo + harness, back up/restore saves, run the flag-updater.
-- **PIDs are session-specific** — always re-enumerate `Get-Process Emuera*` and confirm with the user before killing anything (never kill the user's own game instance).
+- **测试套件是对标签*主体*的单元测试**——它确认每个分支能编译、其守卫会选中它、在你设的状态下能打印而不中止。它**不**测分发*时序*（EVENT 按 cell 迁移触发、GRAVITY/MARKCNG 过度触发——SKILL §1 陷阱 #4/#5/#7）。那些仍需真实游玩或读分发。「自动测试通过」≠「游玩中正确」。
+- **RAND 分支是非确定的：**「通过」意味着该分支被无错到达，而非逐字节相同的输出。RAND 兄弟分支的覆盖率随多轮累积。
+- **粗略覆盖率**（因角色而异；事件多的角色偏低）：约 45–55% 的对话可干净地自动测（日常命令、骚扰、日记、遭遇/色）、约 10% 部分可测（性/计数/刻印/高潮——需要会话上下文）、约 40–45% 需要真实游玩（事件文件 + 弹幕）。报告哪块是哪块，让用户知道要手动覆盖什么。
 
 ---
 
-## 11.12 One-click launcher for chat users (`run_eratw_test.bat`)
+## 11.11 分工
 
-For users who don't have Claude Code driving their machine, the SKILL ships a double-click launcher at the SKILL top level: **`run_eratw_test.bat`** → runs `start_pipeline.ps1`. It makes the whole capture pipeline runnable by a non-technical user.
+- **用户操作所有游戏内 GUI**：读档、开调试控制台（`调试(D)` → `打开调试窗口` → `控制台`）、输入待命命令 `CFLAG:{id}:1099 = 1`、选命令、点击过对话。
+- **你（Claude Code）做**：启动 exe、运行/读 `clip_tap`、读 `emuera.log`、编辑口上 + 测试台、备份/还原存档、运行标志更新器。
+- **PID 是会话特定的**——总是重新枚举 `Get-Process Emuera*` 并在杀任何东西前跟用户确认（绝不杀用户自己的游戏实例）。
 
-**What it does, in order:**
-1. Auto-locates the game root (searches upward from the SKILL folder for the Emuera exe).
-2. Menu: **[1] developer(debug)** — for AUTOTEST (has the Debug menu) — or **[2] player** — the normal game, for manual testing.
-3. **Warns first**, then (on confirm) kills any leftover `clip_tap` + previous game, archives the old `cliplog.txt`, **and deletes `lazyloading.dat` + `emuera.log`** (so newly-added labels are re-indexed — see the ⚠️ callout in §11.6; skipping this is why freshly-added commands/derived kojo appear dead in-game).
-4. Launches the chosen game and a **hidden** `clip_tap` writing to `<skill>/cliplog.txt`.
-5. Shows an explanation panel, then a **live monitor** (last 10 lines of cliplog, refreshed every 2 s). It continuously extracts any AUTOTEST block into **`<skill>/test_result.txt`**.
-6. When the user **closes the game**, it: finalizes `test_result.txt` (AUTOTEST block + the deduped list of `[[MT]]` manual markers seen), reports counts, then runs **two write-back offers**, each confirming the target folder before touching anything:
-   - **AUTOTEST** — if an AUTOTEST block is present, it reads the block's `[[KOJODIR]]` line to auto-detect the kojo folder, shows it for confirmation, and runs `at_update.ps1` (`;@AT` → 测试通过/测试失败). If there's no AUTOTEST block it says so and skips. When every branch passed, it then **offers to comment out the trigger hook** (`disarm_autotest.ps1`) so 会話 won't fire the test again — reversible with `-Rearm`.
-   - **Manual** — locates the folder(s) that actually contain the `[[MT]]` markers (by char id), asks the user to confirm each, and runs `manual_scan.ps1 -Apply` (`;@AT 待手动测试` → 测试通过 and deletes the `[[MT]]` line + its `SIF K{id}_MT_ON()` guard line).
+---
 
-   The launcher is the single entry point: it drives `clip_tap`, `manual_scan`, and `at_update` for the user — they never run the sub-scripts by hand.
+## 11.12 面向聊天用户的一键启动器（`run_eratw_test.bat`）
 
-**`test_result.txt`** is the single small file a chat user hands to the AI for review (it holds both the AUTOTEST transcript and the manual-test hit list).
+对于没有 Claude Code 驱动其机器的用户，SKILL 在 SKILL 顶层附带一个双击启动器：**`run_eratw_test.bat`** → 运行 `start_pipeline.ps1`。它让整条抓取流水线可由非技术用户运行。
 
-**When guiding a chat user, the AI must explain:**
-- **What the launcher is for** — it starts the game + a background recorder so their dialogue gets captured automatically; they never copy/paste logs by hand.
-- **Which button** — developer(debug) to run AUTOTEST; player for manual play. Dev's debug console is a tiny window with **no size setting** — drag the bottom-right corner to enlarge; input line is at the very bottom (nudge past the "总在最前面/always-on-top" button).
-- **AUTOTEST arming** — the guard defaults to **never fire** (arm flag `CFLAG:{id}:1099 == 0`). To run the battery, type `CFLAG:{id}:1099 = 1` in the debug console, then click 会話. It fires once and sets the flag to `2`; to run again, type `CFLAG:{id}:1099 = 1` once more.
-- **`[[MT …]]` markers are normal** — during manual testing a line like `[[MT K6_EV1_今日首问候]]` will appear right before some dialogue; that's the expected test marker, not a bug, and it's auto-removed once the branch is confirmed passed.
-- **Keep the console window open** until they close the game, so the post-game scan runs.
+**它按顺序做什么：**
+1. 自动定位游戏根（从 SKILL 文件夹向上搜 Emuera exe）。
+2. 菜单：**[1] developer(debug)**——用于 AUTOTEST（有 Debug 菜单）——或 **[2] player**——正常游戏，用于手动测试。
+3. **先警告**，然后（确认后）杀掉任何遗留的 `clip_tap` + 之前的游戏，归档旧的 `cliplog.txt`，**并删除 `lazyloading.dat` + `emuera.log`**（这样新加标签会被重新索引——见 §11.6 的 ⚠️ 提示框；跳过这步正是新加命令/派生口上在游戏里像死了的原因）。
+4. 启动所选游戏和一个**隐藏的** `clip_tap`，写往 `<skill>/cliplog.txt`。
+5. 显示一个说明面板，然后一个**实时监视器**（cliplog 最后 10 行，每 2 秒刷新）。它持续把任何 AUTOTEST 块提取到 **`<skill>/test_result.txt`**。
+6. 当用户**关闭游戏**时，它：终结 `test_result.txt`（AUTOTEST 块 + 见到的 `[[MT]]` 手动标记去重列表），报告计数，然后运行**两次回写提议**，每次在动任何东西前确认目标文件夹：
+   - **AUTOTEST** — 若存在 AUTOTEST 块，它读该块的 `[[KOJODIR]]` 行来自动检测口上文件夹，展示出来确认，并运行 `at_update.ps1`（`;@AT` → 测试通过/测试失败）。若没有 AUTOTEST 块就说明并跳过。当每个分支都通过时，它接着**提议注释掉触发挂钩**（`disarm_autotest.ps1`），这样 会話 不会再触发测试——用 `-Rearm` 可逆。
+   - **Manual** — 定位实际包含 `[[MT]]` 标记的文件夹（按角色 id），请用户确认每一个，并运行 `manual_scan.ps1 -Apply`（`;@AT 待手动测试` → 测试通过 并删除 `[[MT]]` 行 + 其 `SIF K{id}_MT_ON()` 守卫行）。
 
-The launcher and all markers/harness are **development-only** — same delivery rule as §11.9: before shipping a kojo, the AUTOTEST hook + `AUTOTEST.ERB` are removed, and `@K{id}_MT_ON()` is flipped to `RETURNF 0` (guarded `[[MT]]` markers may then stay in source, silenced; or be deleted).
+   启动器是唯一入口：它替用户驱动 `clip_tap`、`manual_scan`、`at_update`——他们从不手动跑子脚本。
+
+**`test_result.txt`** 是聊天用户交给 AI 审阅的那个唯一小文件（它同时保存 AUTOTEST 抄本和手动测试命中列表）。
+
+**指导聊天用户时，AI 必须解释：**
+- **启动器是干什么的**——它启动游戏 + 一个后台录制器，让他们的对话被自动抓取；他们从不手动复制/粘贴日志。
+- **按哪个按钮**——developer(debug) 跑 AUTOTEST；player 手动游玩。开发版的调试控制台是个没有尺寸设置的小窗口——拖右下角来放大；输入行在最底部（推过「总在最前面/always-on-top」按钮）。
+- **AUTOTEST 待命**——守卫默认**永不触发**（待命标志 `CFLAG:{id}:1099 == 0`）。要跑测试套件，在调试控制台输入 `CFLAG:{id}:1099 = 1`，然后点 会話。它触发一次并把标志设为 `2`；要再跑一次，再输入一次 `CFLAG:{id}:1099 = 1`。
+- **`[[MT …]]` 标记是正常的**——手动测试时，某段对话前会出现一行像 `[[MT K6_EV1_今日首问候]]` 的东西；那是预期的测试标记、不是 bug，一旦该分支确认通过就会被自动移除。
+- **保持控制台窗口开着**直到他们关游戏，这样游戏后扫描才会运行。
+
+启动器和所有标记/测试台都是**仅开发用**——与 §11.9 相同的交付规则：出货口上前，移除 AUTOTEST 挂钩 + `AUTOTEST.ERB`，并把 `@K{id}_MT_ON()` 翻成 `RETURNF 0`（带守卫的 `[[MT]]` 标记届时可留在源码里、静默；或删掉）。
 
 ---
 
@@ -387,7 +387,7 @@ PRINTL [[TID K{id}_COLOR OK]]
 
 > 不要用「忽略这条警告」来对付第 2 种——警告一旦有了习惯性噪声，第 1 种（真写漏）就会被一起忽略掉。
 
-## 11.13 The battery only tests what you wired into it — cross-check `待自动测试`, and prune passed ones (AI's job, not the launcher's)
+## 11.13 测试套件只测你接进它的东西——交叉核对 `待自动测试`，并修剪已通过的（AI 的活，不是启动器的活）
 
 > ### ⭐原则：能自动测试的，尽量当场就接进测试套件——别默认丢给手动测试
 > **手动测试极耗用户时间**（要真去游戏里一个个触发场景、点过对话）。所以写一个分支时，**先判断它能不能靠状态注入自动测试**：凡是分支只依赖可注入的状态（`TFLAG:193` 成败、`TALENT:*` 关系、`CFLAG:*:好感度`、`BASE:*:酒気`、`Activity_Type:*`、直接 `CALL` 事件/派生/日记 body 等），就应当**标 `待自动测试` 并在同一轮把 `[[TID]]` 块加进测试套件**，而不是图省事标 `待手动测试`。
@@ -397,15 +397,15 @@ PRINTL [[TID K{id}_COLOR OK]]
 
 
 
-"AUTOTEST all-green" is a narrower claim than it sounds. It means **only** that the branches the battery actually `CALL`s ran without halting under the state it set. It says **nothing** about branches you *tagged* `;@AT 待自动测试` but never added a `[[TID … BEGIN]]` block for in `@M_KOJO_K{id}_AUTOTEST`. These two lists drift apart because they're written at different times: the `;@AT 待自动测试` tag is a promise made **while authoring the branch**; the battery entry is added **later, by hand**. It's easy to tag ten branches and wire only seven — and a green run then reads as "all tested" when three were never exercised. This is a front/back inconsistency bug, not a test result.
+「AUTOTEST 全绿」是一个比它听上去更窄的断言。它**只**意味着测试套件实际 `CALL` 的那些分支在它设的状态下无中止地跑了。它对那些你*标了* `;@AT 待自动测试` 却从没在 `@M_KOJO_K{id}_AUTOTEST` 里给它加过 `[[TID … BEGIN]]` 块的分支**只字未证**。这两个列表会脱节，因为它们在不同时间写就：`;@AT 待自动测试` 标签是**写分支时**许下的承诺；测试套件条目是**之后手动**加的。很容易标了十个分支却只接了七个——这时一次绿色运行读起来像「全测了」，而其中三个从未被执行。这是一个前后不一致 bug，不是测试结果。
 
-**So during testing the AI must actively reconcile the two sets** (the launcher/`at_update.ps1` will NOT do this — they only flip `;@AT` status for TIDs that appear in the transcript):
+**所以测试期间 AI 必须主动调和这两个集合**（启动器/`at_update.ps1` 不会做这个——它们只对出现在抄本里的 TID 翻 `;@AT` 状态）：
 
-1. **List the promised set** — every `;@AT 待自动测试 <TID>` across the kojo folder:
+1. **列出承诺集**——口上文件夹里每一个 `;@AT 待自动测试 <TID>`：
    `grep -rho ';@AT 待自动测试 K[0-9]*_[^ ]*' *.ERB | sort -u`
-2. **List the wired set** — every TID the battery brackets:
+2. **列出已接入集**——测试套件括起来的每一个 TID：
    `grep -ho '\[\[TID \(K[0-9]*_[^ ]*\) BEGIN\]\]' M_KOJO_K{id}_AUTOTEST.ERB | sort -u`
-3. **Diff.** Promised-but-not-wired = coverage holes → **add a `[[TID … BEGIN]]` … CALL … `[[TID … OK]]` block to the battery** for each (set up the state that branch needs, CALL the `_1` body). Wired-but-not-promised = usually a stale/renamed TID → fix or drop.
-4. **Report the holes to the user** before declaring the autotest pass meaningful — "battery green, but N tagged branches aren't wired in; I've added them / they still need wiring."
+3. **做差集。** 承诺了但没接入 = 覆盖漏洞 → **给测试套件加一个 `[[TID … BEGIN]]` … CALL … `[[TID … OK]]` 块**（布置该分支需要的状态，CALL `_1` 主体）。接入了但没承诺 = 通常是陈旧/改名的 TID → 修它或丢它。
+4. **向用户报告这些漏洞**，再宣布自动测试通过有意义——「测试套件绿了，但有 N 个标了的分支没接进去；我已经加了它们 / 它们仍需接入。」
 
-**Pruning (de-registration).** Once a battery-exercised branch is confirmed `测试通过`, its `[[TID]]` block can be **removed from `@M_KOJO_K{id}_AUTOTEST`** to keep the battery focused on what's still unverified (mirrors how a passed `[[MT]]` marker is removed). This trimming is the **AI's** call and edit — the launcher/`at_update.ps1` never touch the battery body, only the `;@AT` tags in the kojo. Don't prune reflexively: keep a branch wired if it's cheap and you want it as a permanent regression smoke-test; prune when the battery has grown noisy and re-runs are slow. Either way, the `;@AT 测试通过` tag in the source is the durable record that it passed — the battery entry is optional after that.
+**修剪（注销）。** 一旦一个被测试套件执行的分支确认 `测试通过`，它的 `[[TID]]` 块就可以**从 `@M_KOJO_K{id}_AUTOTEST` 移除**，让测试套件聚焦于仍未验证的东西（与已通过的 `[[MT]]` 标记被移除相镜像）。这项修整是 **AI** 的判断和编辑——启动器/`at_update.ps1` 从不碰测试套件主体，只碰口上里的 `;@AT` 标签。别反射式地修剪：如果一个分支便宜且你想把它当永久回归冒烟测试，就留着它接入；当测试套件长得嘈杂、重跑变慢时再修剪。无论哪种，源码里的 `;@AT 测试通过` 标签才是它通过了的持久记录——测试套件条目在那之后是可选的。

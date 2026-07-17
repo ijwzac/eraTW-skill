@@ -1,0 +1,252 @@
+﻿;-------------------------------------------------
+; K6 露娜切露德 — 依赖（IRAI 委托）口上
+; 引擎分发：KOJO_MESSAGE.ERB CASE "IRAI" → @M_KOJO_IRAI_K{id}(ROLE, SCENE, IRAI_ID)
+; ROLE：委托里露娜的立场  "CLIENT"=委托人本人 / "TARGET"=第三方对象 / "NO_REPORT"=免报告型达成后再遇
+; SCENE：阶段  依頼提示時(=拜托) / 依頼受託時 / 成功報告時(=感谢) / 失敗報告時 / 依頼実行直前・直後 …
+; IRAI_ID：委托人ID×1000 + 子ID（子ID 1~99=一般依頼，用 依頼名 字符串匹配；>100=固有依頼，露娜暂无）
+; 一般依頼 CASE 用的 依頼名 必须与 COMF\依頼\一般依頼NN_*.ERB 里字节一致（繁简混杂，勿改字）。
+;
+; 测试：各分支需要委托系统实际发生。手动测试可在调试台直接调用口上（绕过条件）：
+;   CALL M_KOJO_IRAI_K6("CLIENT","依頼提示時",6003)   ← 测「一起玩吧」的拜托台词
+;   CALL M_KOJO_IRAI_K6("CLIENT","成功報告時",6003)   ← 测感谢台词
+;   （6003 = 露娜6×1000 + 子ID3；换子ID测别的类型：1幫忙做掃除 4想要学習料理 5関于特訓 6誰来告訴我）
+; 走完整链路：CFLAG:6:404 = 6003（依頼内容）、CFLAG:6:403 = 1（依頼状況=未受託），再对露娜用[366]依頼を聞く。
+;-------------------------------------------------
+
+;=== 存否控制：露娜可以发出/参与哪些「一般依頼」（RETURN 0 禁止，默认 1 允许）===
+@M_KOJO_IRAIEXIST_K6(IRAI_NO)
+#DIM IRAI_NO
+SELECTCASE IRAI_NO
+	CASE 12
+		;「想要制裁TA！」＝讨伐委托。露娜是头号胆小鬼，不让她发讨伐委托。
+		RETURN 0
+	CASEELSE
+		RETURN 1
+ENDSELECT
+
+;=== 依赖主口上 ===
+@M_KOJO_IRAI_K6(ROLE, SCENE, IRAI_ID)
+#DIMS ROLE
+#DIMS SCENE
+#DIM  IRAI_ID
+#DIM  CLIENT_ID
+CLIENT_ID = IRAI_ID_TO_CLIENT(IRAI_ID)
+SELECTCASE ROLE
+;================= 露娜作为委托人本人 =================
+CASE "CLIENT"
+	RESETCOLOR
+	SIF FLAG:口上色
+		CALL M_KOJO_COLOR_K6
+	;----- 一般依頼：按 依頼名 分委托类型（只写拜托/感谢两档，其余 SCENE 留空回落引擎默认）-----
+	IF IS_COMMON_IRAI(IRAI_ID)
+		SELECTCASE STR_DATA_IRAI(IRAI_ID, "依頼名", CLIENT_ID)
+			CASE "一起玩吧"
+				SELECTCASE SCENE
+					CASE "依頼提示時"
+						;@AT 待手动测试 K6_IRAI_一起玩_拜托
+						SIF K6_MT_ON()
+						PRINTL [[MT K6_IRAI_一起玩_拜托]]
+						PRINTFORML 「呐、%CALLNAME:MASTER%……难得桑尼和斯塔都不在，你能陪我玩一会儿吗？」
+						PRINTFORMW 「一、一个人玩太没意思了嘛……才、才不是特意找你的哦。」
+					CASE "成功報告時"
+						;@AT 待手动测试 K6_IRAI_一起玩_感谢
+						SIF K6_MT_ON()
+						PRINTL [[MT K6_IRAI_一起玩_感谢]]
+						PRINTFORMW 「呼呼，今天玩得好尽兴！……下、下次还陪我玩，说好了哦？」
+				ENDSELECT
+			CASE "幫忙做掃除"
+				SELECTCASE SCENE
+					CASE "依頼提示時"
+						;@AT 待手动测试 K6_IRAI_扫除_拜托
+						SIF K6_MT_ON()
+						PRINTL [[MT K6_IRAI_扫除_拜托]]
+						PRINTFORML 「那个……房间乱得我都不想动了。%CALLNAME:MASTER%，帮、帮我收拾一下嘛？」
+						PRINTFORMW 「我、我白天没干劲的嘛，你是知道的……拜托啦。」
+					CASE "成功報告時"
+						;@AT 待手动测试 K6_IRAI_扫除_感谢
+						SIF K6_MT_ON()
+						PRINTL [[MT K6_IRAI_扫除_感谢]]
+						PRINTFORMW 「哇，干净多了……谢、谢谢你啦。哼，算你有用。」
+				ENDSELECT
+			CASE "関于特訓"
+				SELECTCASE SCENE
+					CASE "依頼提示時"
+						;@AT 待手动测试 K6_IRAI_特训_拜托
+						SIF K6_MT_ON()
+						PRINTL [[MT K6_IRAI_特训_拜托]]
+						PRINTFORML 「我想再练练弹幕……一个人练总走神。%CALLNAME:MASTER%，陪我特训吧？」
+						PRINTFORMW 「我可是最强的月之妖精，才、才不会输给你呢！」
+					CASE "成功報告時"
+						;@AT 待手动测试 K6_IRAI_特训_感谢
+						SIF K6_MT_ON()
+						PRINTL [[MT K6_IRAI_特训_感谢]]
+						PRINTFORMW 「呼、呼……练得差不多了。哼，你也挺能跟上的嘛……下次再来。」
+				ENDSELECT
+			CASE "想要学習料理"
+				SELECTCASE SCENE
+					CASE "依頼提示時"
+						;@AT 待手动测试 K6_IRAI_料理_拜托
+						SIF K6_MT_ON()
+						PRINTL [[MT K6_IRAI_料理_拜托]]
+						PRINTFORML 「我……我想学会煮咖啡。教教我嘛，%CALLNAME:MASTER%？」
+						PRINTFORMW 「斯塔都会煮了，就我不会……哼，很不甘心的。」
+					CASE "成功報告時"
+						;@AT 待手动测试 K6_IRAI_料理_感谢
+						SIF K6_MT_ON()
+						PRINTL [[MT K6_IRAI_料理_感谢]]
+						PRINTFORMW 「嗯……好像有点会了？下次，我煮给你喝。……才、才不是要报答你呢。」
+				ENDSELECT
+			CASE "誰来告訴我！"
+				SELECTCASE SCENE
+					CASE "依頼提示時"
+						;@AT 待手动测试 K6_IRAI_解惑_拜托
+						SIF K6_MT_ON()
+						PRINTL [[MT K6_IRAI_解惑_拜托]]
+						PRINTFORML 「%CALLNAME:MASTER%，有个东西我怎么都想不明白……你、你懂的多，教教我？」
+						PRINTFORMW 「唔，别笑我啊。妖精本来就不太爱动脑子嘛。」
+					CASE "成功報告時"
+						;@AT 待手动测试 K6_IRAI_解惑_感谢
+						SIF K6_MT_ON()
+						PRINTL [[MT K6_IRAI_解惑_感谢]]
+						PRINTFORMW 「原来是这样啊……哦——！懂了懂了。谢啦，%CALLNAME:MASTER%。」
+				ENDSELECT
+			CASE "大掃除還沒結束"
+				SELECTCASE SCENE
+					CASE "依頼提示時"
+						;@AT 待手动测试 K6_IRAI_大扫除_拜托
+						SIF K6_MT_ON()
+						PRINTL [[MT K6_IRAI_大扫除_拜托]]
+						PRINTFORMW 「年底了，房间乱得像被砂糖果实洗劫过一遍……%CALLNAME:MASTER%，大扫除帮帮我嘛，一个人根本弄不完啦。」
+					CASE "成功報告時"
+						;@AT 待手动测试 K6_IRAI_大扫除_感谢
+						SIF K6_MT_ON()
+						PRINTL [[MT K6_IRAI_大扫除_感谢]]
+						PRINTFORMW 「呼……总算扫完了。有你在，果然快多了。哼，明、明年也拜托你哦。」
+				ENDSELECT
+			CASE "送信"
+				SELECTCASE SCENE
+					CASE "依頼提示時"
+						;@AT 待手动测试 K6_IRAI_送信_拜托
+						SIF K6_MT_ON()
+						PRINTL [[MT K6_IRAI_送信_拜托]]
+						PRINTFORMW 「这封信……能帮我送过去吗？我、我自己去的话，准会在半路上把它弄丢的……」
+					CASE "成功報告時"
+						;@AT 待手动测试 K6_IRAI_送信_感谢
+						SIF K6_MT_ON()
+						PRINTL [[MT K6_IRAI_送信_感谢]]
+						PRINTFORMW 「送到了？太好了……谢谢你。回信要是来了，我第一个念给你听。」
+				ENDSELECT
+			CASE "怎麼也找不到"
+				SELECTCASE SCENE
+					CASE "依頼提示時"
+						;@AT 待手动测试 K6_IRAI_找不到_拜托
+						SIF K6_MT_ON()
+						PRINTL [[MT K6_IRAI_找不到_拜托]]
+						PRINTFORMW 「糟、糟了……有个东西我怎么找都找不到。%CALLNAME:MASTER%，帮我一起找找嘛，拜托了！」
+					CASE "成功報告時"
+						;@AT 待手动测试 K6_IRAI_找不到_感谢
+						SIF K6_MT_ON()
+						PRINTL [[MT K6_IRAI_找不到_感谢]]
+						PRINTFORMW 「找到了！呼……幸好有你。我一个人的话，大概天亮了都还在原地打转呢。」
+				ENDSELECT
+			CASE "想吃美味的魚"
+				SELECTCASE SCENE
+					CASE "依頼提示時"
+						;@AT 待手动测试 K6_IRAI_想吃鱼_拜托
+						SIF K6_MT_ON()
+						PRINTL [[MT K6_IRAI_想吃鱼_拜托]]
+						PRINTFORMW 「突然好想吃鱼哦……那种很鲜的。%CALLNAME:MASTER%，能帮我弄一条来吗？」
+					CASE "成功報告時"
+						;@AT 待手动测试 K6_IRAI_想吃鱼_感谢
+						SIF K6_MT_ON()
+						PRINTL [[MT K6_IRAI_想吃鱼_感谢]]
+						PRINTFORMW 「哇，好香……谢谢你！嘿嘿，果然还是别人弄来的鱼最好吃。」
+				ENDSELECT
+			CASE "正在砍柴"
+				SELECTCASE SCENE
+					CASE "依頼提示時"
+						;@AT 待手动测试 K6_IRAI_砍柴_拜托
+						SIF K6_MT_ON()
+						PRINTL [[MT K6_IRAI_砍柴_拜托]]
+						PRINTFORMW 「柴火快烧完了，夜里会冷的……%CALLNAME:MASTER%，能匀我一些木柴吗？」
+					CASE "成功報告時"
+						;@AT 待手动测试 K6_IRAI_砍柴_感谢
+						SIF K6_MT_ON()
+						PRINTL [[MT K6_IRAI_砍柴_感谢]]
+						PRINTFORMW 「有柴火了，今晚不怕冷啦。谢谢——哼，算你识相。」
+				ENDSELECT
+			CASE "倾听烦恼！"
+				SELECTCASE SCENE
+					CASE "依頼提示時"
+						;@AT 待手动测试 K6_IRAI_烦恼_拜托
+						SIF K6_MT_ON()
+						PRINTL [[MT K6_IRAI_烦恼_拜托]]
+						PRINTFORMW 「那个……我最近有点烦。你、你能听我说说吗？就一会儿也好……」
+					CASE "成功報告時"
+						;@AT 待手动测试 K6_IRAI_烦恼_感谢
+						SIF K6_MT_ON()
+						PRINTL [[MT K6_IRAI_烦恼_感谢]]
+						PRINTFORMW 「说出来，心里舒坦多了……谢谢你肯听。你这个人，意外地可靠嘛。」
+				ENDSELECT
+			CASE "我想吃那个！那个叫什么来着？"
+				SELECTCASE SCENE
+					CASE "依頼提示時"
+						;@AT 待手动测试 K6_IRAI_那个_拜托
+						SIF K6_MT_ON()
+						PRINTL [[MT K6_IRAI_那个_拜托]]
+						PRINTFORMW 「我想吃那个……那个叫什么来着？圆圆的、甜甜的……总、总之你做做看嘛！」
+					CASE "成功報告時"
+						;@AT 待手动测试 K6_IRAI_那个_感谢
+						SIF K6_MT_ON()
+						PRINTL [[MT K6_IRAI_那个_感谢]]
+						PRINTFORMW 「对对，就是这个味道！你怎么猜到的呀……嘿嘿，好厉害。」
+				ENDSELECT
+			CASE "有谁能帮我做一下吗！"
+				SELECTCASE SCENE
+					CASE "依頼提示時"
+						;@AT 待手动测试 K6_IRAI_帮做_拜托
+						SIF K6_MT_ON()
+						PRINTL [[MT K6_IRAI_帮做_拜托]]
+						PRINTFORMW 「肚子饿得咕咕叫了……可我又不会做。%CALLNAME:MASTER%，随便做点什么给我嘛！」
+					CASE "成功報告時"
+						;@AT 待手动测试 K6_IRAI_帮做_感谢
+						SIF K6_MT_ON()
+						PRINTL [[MT K6_IRAI_帮做_感谢]]
+						PRINTFORMW 「呼，总算填饱了……得救了。谢谢你，果然关键时刻还得靠你。」
+				ENDSELECT
+			CASEELSE
+				;其它一般依頼类型——只出一句通用拜托/感谢，避免完全没台词
+				SELECTCASE SCENE
+					CASE "依頼提示時"
+						;@AT 测试通过 K6_IRAI_通用_拜托
+						PRINTFORMW 「那个……%CALLNAME:MASTER%，有件事想拜托你，能、能帮帮我吗？」
+					CASE "成功報告時"
+						;@AT 测试通过 K6_IRAI_通用_感谢
+						PRINTFORMW 「帮大忙了……谢谢你啦。哼，下次我也会努力的。」
+				ENDSELECT
+		ENDSELECT
+		RETURN 1
+	ENDIF
+	;----- 固有依頼（露娜暂无，占位）-----
+	SELECTCASE STR_DATA_IRAI(IRAI_ID, "依頼名", CLIENT_ID)
+	ENDSELECT
+;================= 露娜作为第三方对象（只会收到 実行直前/直後）=================
+CASE "TARGET"
+	SELECTCASE SCENE
+		CASE "依頼実行直前"
+		CASE "依頼実行直後"
+	ENDSELECT
+;================= 免报告型委托达成后再遇露娜 =================
+CASE "NO_REPORT"
+	IF IS_COMMON_IRAI(IRAI_ID)
+		SELECTCASE STR_DATA_IRAI(IRAI_ID, "依頼名", CLIENT_ID)
+			CASE "給花澆水"
+				;@AT 待手动测试 K6_IRAI_浇花_免报告
+				SIF K6_MT_ON()
+				PRINTL [[MT K6_IRAI_浇花_免报告]]
+				PRINTFORMW 「啊，花浇过了？……嗯，谢谢。夜里的花，喝饱了水才有精神呢。」
+			CASE "誰的遺失物"
+		ENDSELECT
+	ENDIF
+ENDSELECT
+RETURN 1

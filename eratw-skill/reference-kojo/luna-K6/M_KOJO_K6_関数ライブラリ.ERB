@@ -13,13 +13,60 @@ ENDIF
 RETURNF 0
 
 ;按时段返回一句露娜风格的问候（字符串）
+;TIME:2 是时段桶：1早朝(4~6) 2正午前(6~12) 3昼(12~15) 4昼下がり(15~18) 5夕(18~20) 6夜(20~23) 7深夜(23~4)
+;（无 0 值；1~4=白天、5~7=夜。夜之妖精：白天犯困、越夜越精神）
 @K6_GREETING()
 #FUNCTIONS
 SELECTCASE TIME:2
-	CASE 0, 1
-		RETURNF "夜里好……难得你也醒着呢。"
-	CASE 2, 3
+	CASE 1, 2
+		RETURNF "唔……这么早，我一夜没睡，还困着呢。"
+	CASE 3, 4
 		RETURNF "唔……大白天的，好刺眼。"
 	CASEELSE
-		RETURNF "晚上，才是妖精的主场哦。"
+		RETURNF "夜里好……现在才是妖精的主场哦。"
 ENDSELECT
+
+;===== 手动测试标记总开关（[[MT]] 守护开关）=====
+;开发/测试期 = 1：所有被 SIF K6_MT_ON() 守护的 PRINTL [[MT ...]] 标记正常打印，供实录(cliplog)抓取。
+;正式发布前 = 0：AI 汇报还有多少手动测试未过后，把这里改成 RETURNF 0，全部标记一处静默，普通玩家永不可见。
+@K6_MT_ON()
+#FUNCTION
+RETURNF 1
+
+;闯入厕所/浴室的共通交互：好感度分层初反应 + 二选一(离开/留下) + 改信賴/好感 + 传送回原房间
+;ARGS = "厕所" 或 "浴室"（措辞用）。ASK_YN 极性：RESULT 0=第一项。信賴度=CFLAG槽4、好感度=槽2。
+;⚠ARGS 是 Emuera 保留的位置字符串参数、自动可用，【绝不能】再 #DIMS ARGS 声明（会 halt，pitfall #1）。
+@K6_INTRUDE_PRIVATE(ARGS)
+IF CFLAG:6:好感度 >= 1500
+	PRINTFORML 「呀……！%CALLNAME:MASTER%，你、你怎么进来了……！」
+	PRINTFORMW （露娜红着脸，却没像往常那样立刻把你赶出去——大概是已经习惯了你的存在。）
+ELSEIF CFLAG:6:好感度 >= 500
+	PRINTFORML 「哇——！出、出去出去，这种时候不许进来啦！」
+	PRINTFORMW （露娜手忙脚乱，急得话都快说不成句了。）
+ELSE
+	PRINTFORML （%CALLNAME:MASTER%推门而入，正撞见露娜在%ARGS%里。）
+	PRINTFORMW 「唔哇——！！变、变态！给我滚出去！！」
+ENDIF
+CALL ASK_YN("识趣地退出去", "厚着脸皮留下")
+IF RESULT == 0
+	;离开：加信赖，传送回进来前的房间
+	CFLAG:6:信賴度 += 15
+	PRINTFORML （%CALLNAME:MASTER%连忙退了出去。露娜悄悄松了口气——这份识趣，她记下了。）
+	;数值变动明示给玩家，否则悄悄改了没人察觉
+	PRINTFORMW 【露娜的信赖度 +15】
+	CFLAG:MASTER:現在位置 = CFLAG:MASTER:前一次的位置
+	CALL TARGETSET_CHACK
+ELSE
+	;留下：减信赖减好感（好感≥1500 已不在意，免罚）
+	IF CFLAG:6:好感度 >= 1500
+		PRINTFORMW 「……真是的，只、只准看一眼哦。哼，谁让你是特别的呢。」
+	ELSE
+		;好感度不足 30 时只扣到 0 为止，故先算出【实际】扣掉多少再打印，免得报一个没真扣满的数
+		LOCAL = MIN(CFLAG:6:好感度, 30)
+		CFLAG:6:信賴度 -= 20
+		CFLAG:6:好感度 -= LOCAL
+		PRINTFORML （露娜气得浑身发抖，抄起手边的东西就往你身上砸——这个无赖，她绝对要记恨好一阵子。）
+		PRINTFORMW 【露娜的好感度 -{LOCAL}　信赖度 -20】
+	ENDIF
+ENDIF
+RETURN 1

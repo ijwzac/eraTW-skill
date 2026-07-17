@@ -19,7 +19,7 @@ IF LOCAL
 		ENDSELECT
 		SOURCE:6:情愛 += 60
 	ELSE
-		;@AT 待自动测试 K6_COUNTER1_中立
+		;@AT 测试通过 K6_COUNTER1_中立
 		SELECTCASE RAND:2
 			CASE 0
 				PRINTFORMW 「……你要是没事，我可要去找桑尼和斯塔了哦。三个人一起，才好恶作剧嘛。」
@@ -49,8 +49,9 @@ RETURN 14
 
 @UNIQUE_COUNTER1_MESSAGE_K6
 ;@AT 待手动测试 K6_UNIQUE_COUNTER1
+SIF K6_MT_ON()
+PRINTL [[MT K6_UNIQUE_COUNTER1]]
 PRINTFORML 露娜以为神不知鬼不觉地打了个响指，把四周的声音悄悄消掉。
-PRINTFORML 「……（叽里咕噜地抱怨着什么，可惜一个字也传不出来。）」
 PRINTFORMW （只是她大概忘了，消音是「双向」的——此刻的她，也听不见%CALLNAME:MASTER%正憋着笑。）
 RETURN 1
 

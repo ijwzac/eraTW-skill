@@ -19,10 +19,10 @@ LOCAL = 1
 IF LOCAL
 	IF FLAG:時間停止
 	ELSEIF TALENT:6:恋人
-		;@AT 待自动测试 K6_306_恋人
+		;@AT 测试通过 K6_306_恋人
 		PRINTFORMW 「呼呼……手好暖。妖精的肚子，可是很少让人摸的哦……只、只准你一个人。」
 	ELSE
-		;@AT 待自动测试 K6_306_中立
+		;@AT 测试通过 K6_306_中立
 		PRINTFORML 「喂——！那、那里很痒的啦！」
 		PRINTFORMW （露娜咯咯地笑着躲开，一个没站稳，又摔了个屁股墩。）
 	ENDIF
@@ -45,12 +45,49 @@ LOCAL = 1
 IF LOCAL
 	IF FLAG:時間停止
 	ELSEIF TALENT:6:恋慕 || TALENT:6:恋人
-		;@AT 待自动测试 K6_307_恋慕恋人
+		;@AT 测试通过 K6_307_恋慕恋人
 		PRINTFORML 「呜——、别、别捏啦，会变成栗子嘴的！」
 		PRINTFORMW （露娜鼓起脸颊抗议，那模样倒真有几分像人妖名鉴里画的样子。）
 	ELSE
-		;@AT 待自动测试 K6_307_中立
+		;@AT 测试通过 K6_307_中立
 		PRINTFORMW 「哼，把脸凑过来让你捏，是看在你还算有趣的份上——才、才不是喜欢呢。」
+	ENDIF
+ENDIF
+RETURN 1
+
+;==================================================
+;派生 60,掏耳朵（SCOM）—— 连招触发：上一指令=305 索求膝枕，本指令=302 身体接触（引擎 SOURCE_CALLCOM 判定）。
+;  ⚠必须 305 紧接 302（中间不插别的指令），且【不是】336 膝枕→302。缺此标签会走引擎通用文本，补了则有专属台词。
+;  TFLAG:193(1=大成功 0=成功 -1=失败，失败方是露娜)
+;==================================================
+@M_KOJO_SUCCESS_SCOM_K6_60
+TFLAG:192 = 0
+
+@M_KOJO_MESSAGE_SCOM_K6_60
+CALL TRAIN_MESSAGE
+CALL M_KOJO_MESSAGE_SCOM_K6_60_1
+RETURN RESULT
+
+@M_KOJO_MESSAGE_SCOM_K6_60_1
+LOCAL = 1
+IF LOCAL
+	IF FLAG:時間停止
+	ELSE
+		SELECTCASE TFLAG:193
+			CASE 1
+				;大成功
+				;@AT 待自动测试 K6_SCOM60_大成功
+				PRINTFORML 「别、别动哦……夜里我眼神最好，掏耳朵这种事，交给我准没错。」
+				PRINTFORMW （露娜把周围的声音一收，只剩耳边她极轻的呼吸——手法又稳又轻，%CALLNAME:MASTER%舒服得差点睡着。）
+			CASE 0
+				;成功
+				;@AT 测试通过 K6_SCOM60_成功
+				PRINTFORMW 「唔，让我看看……啊，有啦有啦。别乱动，痒也得忍着。」
+			CASEELSE
+				;失败（露娜手抖/走神）
+				;@AT 待自动测试 K6_SCOM60_失败
+				PRINTFORMW 「呀……！对、对不起，手滑了一下……我、我不是故意的啦！」
+		ENDSELECT
 	ENDIF
 ENDIF
 RETURN 1

@@ -12,7 +12,7 @@
 ;   CFLAG:6:1001  已与主角一起消音过一次（初次消音演出用）
 ; TCVAR:6:350-398   当日临时标记（每日清零）
 ;   TCVAR:6:350  今日已朝问候
-; TCVAR:6:399       ★口上自动测试开关（KOJO_AUTOTEST_SWITCH）——仅测试用，禁止在正式内容里引用
+; （自动测试的触发守卫改用游戏原生 DEBUGGERR，不再占用 TCVAR:6:399，见 M_KOJO_K6_AUTOTEST.ERB）
 ;****************************************************************
 
 ;### 口上存在判定 ###################################
@@ -25,12 +25,12 @@ RETURN 1
 ;时停/眠奸/扮演时是否照常念口上（1=念）
 CFLAG:6:時間停止口上有 = 1
 CFLAG:6:眠姦口上有 = 0
-CFLAG:6:なりきり口上有 = 1
+CFLAG:6:扮演口上有 = 1
 ;口上内抱き寄せ（推倒）判定交由 PERMISSION 处理
 CFLAG:6:口上内抱き寄せ判定_初回 = 1
 CFLAG:6:口上内抱き寄せ判定_通常 = 1
 ;破瓜取消口上交由 LOST_VIRGIN_STOP 处理
-CFLAG:6:破瓜キャンセル口上有 = 1
+CFLAG:6:破瓜中止口上有 = 1
 ;还没面识时不主动来访（胆小、怕生）
 IF !CFLAG:6:面識
 	CFLAG:6:来訪不能 = 1
@@ -39,9 +39,16 @@ ELSE
 ENDIF
 ;没到恋慕之前不会自己扑上来（她可是头号胆小鬼）
 IF !TALENT:6:恋慕 && !TALENT:6:炮友
-	CFLAG:6:押し倒し禁止 = 1
+	CFLAG:6:推倒禁止 = 1
 ELSE
-	CFLAG:6:押し倒し禁止 = 0
+	CFLAG:6:推倒禁止 = 0
+ENDIF
+;=== AUTOTEST 外部 arm 哨兵（本 skill 口上的标记 + 开关；面向玩家交付前删除本段与哨兵文件）===
+;  本口上目录里放一个哨兵文件：autotest.on=启用 / autotest.off=禁用（用文件名编码状态，因 EXISTFILE 只判存在）。
+;  启动器扫 個人口上/**/autotest.o* 即可发现所有 skill 口上并读出状态，并按玩家选择在 .on/.off 间改名切换。
+;  读档时本函数必被调用：若哨兵为 autotest.on 就把待命位置 1。!=2 保持三态语义(本存档跑过一次不再重 arm)。
+IF CFLAG:6:1099 != 2 && EXISTFILE("ERB/口上・メッセージ関連/個人口上/006 Luna [ルナ]/露娜切露德_重制/autotest.on")
+	CFLAG:6:1099 = 1
 ENDIF
 RETURN 1
 
@@ -56,7 +63,7 @@ RETURN 1
 
 ;### ENCOUNTER（初遇）#############################
 @M_KOJO_ENCOUNTER_K6
-;@AT 待自动测试 K6_ENCOUNTER
+;@AT 测试通过 K6_ENCOUNTER
 PRINTFORML （周围的声音忽然消失了——一片诡异的寂静里，一个稻草色短发的小妖精正歪着头打量%CALLNAME:MASTER%。）
 PRINTFORML 「……唔，被发现了。」
 PRINTFORML 「我是露娜切露德。光之三妖精里……负责月亮的那个。」
@@ -92,6 +99,7 @@ RETURN 0
 ;记入检查（=0 不显示，1 显示）
 LOCAL = 1
 IF LOCAL
+	;@AT 测试通过 K6_SPEVENT1_初吻
 	PRINTFORML 「那个……%CALLNAME:MASTER%，等、等一下。」
 	PRINTFORML （露娜打了个响指，四周的声音瞬间被抽空——只剩下两个人的呼吸。）
 	PRINTFORML 「这样……就没有人能听见了。也没有人能打扰了。」
@@ -111,6 +119,9 @@ IF LOCAL
 	SELECTCASE ARG
 		CASE 0
 			;告白内容（之后会弹出是否接受的选项）
+			;@AT 待手动测试 K6_SPEVENT2_告白
+			SIF K6_MT_ON()
+			PRINTL [[MT K6_SPEVENT2_告白]]
 			PRINTFORML 「我……我想了很久，也抱怨了很久。」
 			PRINTFORML 「明明是妖精，明明只要恶作剧和睡觉就够了……可满脑子却都是%CALLNAME:MASTER%。」
 			PRINTFORMW 「所以……那个。以后，能不能只对我一个人，特别一点？」
@@ -133,9 +144,29 @@ RETURN 1
 RETURN 0
 
 @M_KOJO_SPEVENT_K6_3(ARG, ARG:1)
-;此槽位暂留空回退
-LOCAL = 0
+;约会归途·兜底口上。引擎有两条约会结束路径（已查证）：
+;  ①玩家用「从外面回家」命令手动结束 → @DATE_EVENT：未被吻过发 SP_EVENT1(初吻)、达阈值发 SP_EVENT2(告白)、其余落【本槽 SP_EVENT3】。出处 DATE_CMN.ERB @DATE_EVENT:285/293。
+;  ②角色自己到点回家(!VISIT) → @KITAKU → EVENT_20 ARG2(约会中帰宅)。出处 MOVEMENT2.ERB:254。
+;  故「玩家手动结束约会时的归来对话」正是本槽位（初吻发生后每次手动回家都走这里）；EVENT_20 那套要角色自然到点才走。两条都要有内容。
+LOCAL = 1
 IF LOCAL
+	IF TALENT:6:恋人
+		;@AT 待手动测试 K6_SPEVENT3_恋人
+		SIF K6_MT_ON()
+		PRINTL [[MT K6_SPEVENT3_恋人]]
+		PRINTFORML 「今天……玩得很开心。和你在一起，连白天都没那么难熬了。」
+		PRINTFORMW （露娜把周围的声音一收，凑过来飞快地补了一句：「……下次，还要一起出去哦。」）
+	ELSEIF TALENT:6:恋慕
+		;@AT 待手动测试 K6_SPEVENT3_恋慕
+		SIF K6_MT_ON()
+		PRINTL [[MT K6_SPEVENT3_恋慕]]
+		PRINTFORML （露娜揪着裙子，犹豫了半天）
+		PRINTFORMW 「今天……还，还算有意思啦。明天你一定要人陪的话我也……不过我还得跟斯塔她们……」
+	ELSE
+		;思慕/中立
+		;@AT 测试通过 K6_SPEVENT3_思慕
+		PRINTFORMW 「回来啦……嗯，今天没摔跤，也没被桑尼笑话，算是不错的一天了。」
+	ENDIF
 ENDIF
 RETURN 1
 
@@ -151,30 +182,65 @@ RETURN 1
 ;★同格守卫（SKILL pitfall #4）
 SIF CFLAG:6:現在位置 != CFLAG:MASTER:現在位置
 	RETURN 0
+;★引擎分发设计（据典 K139 官方注释）：一次遭遇会依次触发多个 ARG 子相位——
+;  当天首次见面时，引擎【先】发 ARG 8(室内首次问候)/9(外出首次问候)，【再】接常规遭遇 ARG 1/2(室内)/6/7(外出)。
+;  故「每日首次＝额外问候＋常规遭遇」本就是原生设计：让 8/9 只放简短「今日首次」问候、1/2/6/7 放常规内容，
+;  就会自然叠成「问候句＋日常句」两句，正是想要的效果。
+;  8 与 9 之间用当日标记 TCVAR:6:350 去重（室内级与外出级问候同日只出一次）；常规遭遇(1/2/6/7)不加闸，
+;  故同日再次遇见仍正常出声，只是不再重复「今日首次」问候。TCVAR:6:350 由 BEFORETRAIN 每日清零。
 SELECTCASE ARG
 	CASE 8
-		;当日第一次问候（之后会接到 1 或 2）
+		;当天第一次见面·室内首次问候（之后引擎会接 ARG 1/2）
+		SIF TCVAR:6:350
+			RETURN 1
 		TCVAR:6:350 = 1
+		;★十六夜之夜特殊事件：@SPECIALDAY_EVENT_K6 不是引擎自动派发的标签，必须由口上自己从被引擎调用的事件里手动 CALL
+		;  （参照こいし K38：在 EVENT_1 里日期判断后 CALL SPECIALDAY_EVENT_K38）。这里在「当日首次室内问候」时机触发，
+		;  16 号入夜(TIME:2>=5)则用月见事件替代首问候；SPECIALDAY 内部还会再校验日期/面識/同处，返回 1 表示已触发。
+		IF DAY:3 == 16 && TIME:2 >= 5
+			CALL SPECIALDAY_EVENT_K6
+			SIF RESULT == 1
+				RETURN 1
+		ENDIF
+		;@AT 测试通过 K6_EV1_今日首问候
 		IF TALENT:6:恋人
-			PRINTFORMW 「早……啊，不对，现在是白天啊。唔，晚上好？总之——%CALLNAME:MASTER%，你来啦。」
+			PRINTFORMW 「啊，%CALLNAME:MASTER%……今天，还是第一次见你呢。哼，我、我才没有在数。」
 		ELSE
-			PRINTFORMW 「唔……又是你。哼，我可没有在等你哦。」
+			PRINTFORMW 「唔……又是你。今天头一回照面……哼，我可没有在等你哦。」
 		ENDIF
 		RETURN 1
 	CASE 1
-		;你进来了
+		;★闯入特殊房间（引擎通用房间类型判定，不硬编码房号）：厕所/浴室走二选一交互，厨房只馋一句
+		IF IN_TOILET(CFLAG:MASTER:現在位置)
+			CALL K6_INTRUDE_PRIVATE("厕所")
+			RETURN 1
+		ELSEIF BATHROOM()
+			CALL K6_INTRUDE_PRIVATE("浴室")
+			RETURN 1
+		ELSEIF KITCHEN() && !(CFLAG:MASTER:現在位置 >= 26 && CFLAG:MASTER:現在位置 <= 35)
+			;厨房馋相（仅非三妖精之家的厨房：26-35 是三妖精之家房号范围、含厨房29）
+			;@AT 待手动测试 K6_EV1_厨房馋
+			SIF K6_MT_ON()
+			PRINTL [[MT K6_EV1_厨房馋]]
+			PRINTFORML （露娜正踮着脚，眼睛直勾勾盯着橱柜，手伸到一半又猛地缩了回来。）
+			PRINTFORMW 「唔……我、我才不是要偷吃！只是在帮忙检查有没有坏掉的东西啦！对，就是这样！」
+			RETURN 1
+		ENDIF
+		;主角走到了露娜所在的格子（地点不定：她的房间、屋外、别处都可能，故措辞须地点无关）
+		;@AT 测试通过 K6_EV1_你走近
 		IF TALENT:6:恋人
 			PRINTFORML 「呀，%CALLNAME:MASTER%！」
 			PRINTFORMW （露娜把周围的声音一收，凑过来小声说：「这样别人就听不到我们说话了……嘿嘿。」）
 		ELSEIF TALENT:6:恋慕
-			PRINTFORML 「……进、进来之前敲门啊笨蛋！吓我一跳……」
-			PRINTFORMW （她慌慌张张把手里的东西藏到背后，像是刚才在偷偷摆弄什么。）
+			PRINTFORML 「唔哇！你、你别悄没声地凑过来啊，吓我一跳……！」
+			PRINTFORMW （她慌慌张张把手里的东西往身后藏，像是刚才在偷偷摆弄什么。）
 		ELSE
-			PRINTFORMW 「……哼，人类的房间也没什么好看的嘛。我只是路过。」
+			PRINTFORMW 「唔……是你啊。哼，别自作多情，我可没在等你——只是刚好在这儿罢了。」
 		ENDIF
 		RETURN 1
 	CASE 2
 		;她进来了
+		;@AT 测试通过 K6_EV1_她进来
 		IF TALENT:6:恋人
 			PRINTFORMW 「打扰啦——诶嘿，其实是想你了才来的。这种话，只有把声音消掉才敢说呢。」
 		ELSE
@@ -183,55 +249,198 @@ SELECTCASE ARG
 		RETURN 1
 	CASE 6
 		;外出遭遇
+		;@AT 待手动测试 K6_EV1_外出遭遇
+		SIF K6_MT_ON()
+		PRINTL [[MT K6_EV1_外出遭遇]]
 		PRINTFORML 「唔哇，是%CALLNAME:MASTER%……大白天的，晃得我眼睛疼。」
 		PRINTFORMW 「我可是夜里才有精神的。白天遇到，就当没看见吧，互相的。」
 		RETURN 1
 	CASE 7
-		;约会中被撞见（ARG:1=约会对象）
+		;约会中被撞见（ARG:1=约会对象的角色号）
+		;★特例：玩家正和桑尼(5)/斯塔(7)约会时撞见露娜——按露娜对玩家的关系分层（三妖精间的复杂心情）
+		IF ARG:1 == 5 || ARG:1 == 7
+			;@AT 待手动测试 K6_EV1_约会撞见姐妹
+			SIF K6_MT_ON()
+			PRINTL [[MT K6_EV1_约会撞见姐妹]]
+			IF TALENT:6:恋人
+				PRINTFORML 「哦——是%CALLNAME:MASTER%和%CALLNAME:(ARG:1)%呀。」
+				PRINTFORMW （露娜怔了怔，忽然释然地笑了。「……其实这样也挺好。三个人再加上你，大家一直一起玩下去——那才是最棒的嘛。」）
+			ELSEIF TALENT:6:恋慕
+				PRINTFORML 「……跟%CALLNAME:(ARG:1)%？为、为什么……偏偏不是我啊。」
+				PRINTFORMW （露娜咬着下唇别过脸，那点藏不住的不甘心，比平时任何一次逞强都明显。）
+			ELSEIF TALENT:6:思慕
+				PRINTFORML 「诶、诶——！？你、你们两个……在、在约会！？」
+				PRINTFORMW （露娜慌得话都说不利索，脸一路红到耳根，踉跄着后退了好几步。）
+			ELSE
+				PRINTFORML 「哦，和%CALLNAME:(ARG:1)%约会啊。」
+				PRINTFORMW 「那家伙笨手笨脚的，你可得看好她——别让她给你惹太多麻烦哦。」
+			ENDIF
+			RETURN 1
+		ENDIF
+		;一般情形：和其他人约会时撞见
+		;@AT 待手动测试 K6_EV1_约会撞见
+		SIF K6_MT_ON()
+		PRINTL [[MT K6_EV1_约会撞见]]
 		PRINTFORML 「诶……%CALLNAME:MASTER%在跟别人约会？」
 		PRINTFORMW （露娜张了张嘴想抱怨点什么，最后只是把周围的声音消掉，扭头飞走了。）
 		RETURN 1
 	CASE 9
-		;外出当日第一次问候
+		;当天第一次见面·外出首次问候（ARG:1=约会对象；之后引擎会接 ARG 6/7）
+		SIF TCVAR:6:350
+			RETURN 1
 		TCVAR:6:350 = 1
+		;@AT 待手动测试 K6_EV1_今日首问候外出
+		SIF K6_MT_ON()
+		PRINTL [[MT K6_EV1_今日首问候外出]]
 		IF ARG:1
-			PRINTFORMW 「……在跟别人约会？哼，随便你啦。」
+			PRINTFORMW 「哟，今天头一回碰到你……居然是在跟别人约会。哼，随便你啦。」
 		ELSE
-			PRINTFORMW 「白天出门……真稀奇。我？我只是在找掉下来的月亮碎片啦。」
+			PRINTFORMW 「哟，今天头一回碰到你呢。……才、才不是特意在找你，只是刚好路过啦。」
 		ENDIF
 		RETURN 1
 ENDSELECT
 RETURN 1
 
 ;==================================================
-;2,早上起床（早安口上）——夜之妖精的早晨最难熬
+;2,早上起床（早安口上，约在她起床時間 8:00 触发）
+;人设：露娜就寝=2:00、起床=8:00（三妖精里睡得最晚、起得最晚），不是昼夜颠倒，只是晚睡晚起。
 ;==================================================
 @M_KOJO_EVENT_K6_2(ARG, ARG:1)
 SIF CFLAG:6:現在位置 != CFLAG:MASTER:現在位置
 	RETURN 0
+;@AT 测试通过 K6_EV2_早安
 IF TALENT:6:恋人
-	PRINTFORMW 「唔……早上好……呼啊……让我再、再靠一会儿……夜里根本睡不着，白天才是我的深夜啊……」
+	PRINTFORMW 「唔……早上好……呼啊……昨晚又贪玩到快两点才睡，让我、让我再赖一小会儿嘛……」
 ELSE
-	PRINTFORMW （露娜顶着一对黑眼圈，睡眼惺忪地打了个大大的哈欠。看来又是一夜没睡。）
+	PRINTFORMW （露娜顶着黑眼圈打了个大大的哈欠——三妖精里数她睡得最晚，这会儿还没完全睡醒。）
 ENDIF
 RETURN 1
 
 ;==================================================
-;3,夜里睡觉（晚安口上）——因夜失眠：夜里她精神得很
+;3,就寝相关（约在她就寝時間 2:00 前后触发）
+;ARG 2=就寝前还不肯睡（她睡得最晚）  3=已入睡（深夜2点后）
 ;==================================================
 @M_KOJO_EVENT_K6_3(ARG, ARG:1)
 SIF CFLAG:6:現在位置 != CFLAG:MASTER:現在位置
 	RETURN 0
 SELECTCASE ARG
 	CASE 2
-		;显得困倦——她才不困
-		PRINTFORMW 「困？我才不困呢。夜里正是妖精最精神的时候……人类快去睡你的吧。」
+		;就寝前还精神——三妖精里她撑得最晚
+		;@AT 测试通过 K6_EV3_装困
+		PRINTFORMW 「困？才、才没有呢。都快两点了还硬撑着不睡的，三妖精里可只有我一个哦……哼，很厉害吧。」
 		RETURN 1
 	CASE 3
-		;睡眠中——白天补觉
-		PRINTFORMW （露娜蜷在铺满黑白蕾丝的床上，白天睡得正香。月光妖精的作息，果然和人类是反的。）
+		;已入睡——熬到两点才睡下
+		;@AT 测试通过 K6_EV3_补觉
+		PRINTFORMW （好不容易熬到两点，露娜才蜷进铺满黑白蕾丝的被窝，这会儿睡得正香。）
 		RETURN 1
 ENDSELECT
+RETURN 1
+;==================================================
+;4,移動時すれちがい（主角用移动命令路过露娜所在中継格、不落脚）
+;ARG 由玩家菜单选择决定：1=停下(随后转EVENT_1常规遭遇) / 2=打招呼路过 / 3=无视路过。
+;⚠绝不要写同格守卫(現在位置!=MASTER)！ARG 2/3 时主角在移动、并不同格，加了会整段吞掉。
+;引擎不读本事件返回值，RETURN 0 即可。派发源 COMF400 移動.ERB:411/417/419。
+;“和别人约会”判定：CHK_DATENOW(CFLAG:MASTER:约会中) && FLAG:约会的对象 != TARGET && FLAG:约会的对象 != 0
+;==================================================
+@M_KOJO_EVENT_K6_4(ARG, ARG:1)
+;口上主是 TARGET(露娜6)
+LOCAL = 1
+IF LOCAL
+	IF ARG == 1
+		;停下→随后 EVENT_1 接管常规遭遇，这里只出极短过场
+		;@AT 待手动测试 K6_EV4_停下
+		SIF K6_MT_ON()
+		PRINTL [[MT K6_EV4_停下]]
+		PRINTFORMW （露娜察觉到%CALLNAME:MASTER%停下了脚步，歪了歪头。）
+		RETURN 0
+	ELSEIF ARG == 2
+		;打招呼路过
+		IF CHK_DATENOW(CFLAG:MASTER:约会中) && FLAG:约会的对象 != TARGET && FLAG:约会的对象 != 0
+			;带着别人、只是打个招呼路过
+			;@AT 待手动测试 K6_EV4_打招呼_带别人
+			SIF K6_MT_ON()
+			PRINTL [[MT K6_EV4_打招呼_带别人]]
+			PRINTFORMW 「哦……你好呀。哼，带着别人呢，那我就不打扰啦。」（露娜别过脸，把话音消掉了小半。）
+		ELSEIF TALENT:6:恋人
+			;@AT 待手动测试 K6_EV4_打招呼_恋人
+			SIF K6_MT_ON()
+			PRINTL [[MT K6_EV4_打招呼_恋人]]
+			PRINTFORMW 「呀，%CALLNAME:MASTER%！……只是路过？哼，那下次可要停下来陪我说会儿话哦。」
+		ELSEIF TALENT:6:恋慕
+			;@AT 待手动测试 K6_EV4_打招呼_恋慕
+			SIF K6_MT_ON()
+			PRINTL [[MT K6_EV4_打招呼_恋慕]]
+			PRINTFORMW 「啊，是你……嗯、嗯，路上小心。才、才不是舍不得你走呢。」
+		ELSEIF TALENT:6:思慕 || CFLAG:6:好感度 >= 500
+			;@AT 测试通过 K6_EV4_打招呼_思慕
+			PRINTFORMW 「哟，是%CALLNAME:MASTER%。……嗯，你去忙吧。」
+		ELSE
+			;@AT 待手动测试 K6_EV4_打招呼_中立
+			SIF K6_MT_ON()
+			PRINTL [[MT K6_EV4_打招呼_中立]]
+			PRINTFORMW （露娜朝%CALLNAME:MASTER%轻轻点了下头，就继续做自己的事去了。）
+		ENDIF
+		RETURN 0
+	ELSEIF ARG == 3
+		;无视路过
+		IF CHK_DATENOW(CFLAG:MASTER:约会中) && FLAG:约会的对象 != TARGET && FLAG:约会的对象 != 0
+			;被无视、又见你带着别人
+			;@AT 待手动测试 K6_EV4_无视_带别人
+			SIF K6_MT_ON()
+			PRINTL [[MT K6_EV4_无视_带别人]]
+			PRINTFORMW （露娜瞥见%CALLNAME:MASTER%带着别人径直走过、没理她，便把到嘴边的话连声音一起消掉了。）
+		ELSEIF TALENT:6:恋人
+			;@AT 待手动测试 K6_EV4_无视_恋人
+			SIF K6_MT_ON()
+			PRINTL [[MT K6_EV4_无视_恋人]]
+			PRINTFORMW 「诶……就这么走过去了？喂、喂！……哼，晚上可要好好补偿我。」
+		ELSEIF TALENT:6:恋慕
+			;@AT 待手动测试 K6_EV4_无视_恋慕
+			SIF K6_MT_ON()
+			PRINTL [[MT K6_EV4_无视_恋慕]]
+			PRINTFORMW 「……看都不看我一眼就走了。哼，无、无所谓啦，反正我也很忙的。」
+		ELSEIF TALENT:6:思慕 || CFLAG:6:好感度 >= 500
+			;@AT 测试通过 K6_EV4_无视_思慕
+			PRINTFORMW 「唔，急着赶路啊……也不打声招呼。真是的。」
+		ELSE
+			;@AT 待手动测试 K6_EV4_无视_中立
+			SIF K6_MT_ON()
+			PRINTL [[MT K6_EV4_无视_中立]]
+			PRINTFORMW （%CALLNAME:MASTER%没停留就走了过去。露娜「哼」了一声，当作没看见。）
+		ENDIF
+		RETURN 0
+	ENDIF
+ENDIF
+RETURN 0
+
+
+;==================================================
+;13,お仕事中（工作口上；露娜的工作＝和三妖精玩耍）ARG 1=工作開始 2=業務中 3=お疲れ様(工作终了)
+;触发出处：引擎 MOVEMENTS/JOB_仕事開始終了処理.ERB CALL KOJO_MESSAGE_SEND("EVENT",13,...)。ARG:1=残余工作量
+;==================================================
+@M_KOJO_EVENT_K6_13(ARG, ARG:1)
+LOCAL = 1
+IF LOCAL
+	SELECTCASE ARG
+		CASE 1
+			;工作開始（去职场＝桑尼私室开玩）
+			;@AT 测试通过 K6_EV13_工作開始
+			PRINTFORMW 「今天玩什么好呢……躲猫猫？还是去捡掉下来的月亮碎片？嘿嘿。」
+		CASE 2
+			;業務中（正玩着）
+			;@AT 测试通过 K6_EV13_業務中
+			IF TALENT:6:恋人
+				PRINTFORMW 「%CALLNAME:MASTER%！别光看啦，快来当我这队的——有你在，桑尼她们绝对赢不了！」
+			ELSE
+				PRINTFORMW （露娜正和桑尼、斯塔追逐打闹，一个没留神又摔了个屁股墩，却笑得很开心。）
+			ENDIF
+		CASE 3
+			;お疲れ様（玩耍结束）
+			;@AT 测试通过 K6_EV13_お疲れ様
+			PRINTFORMW 「呼……今天玩得真尽兴。累是累了点，不过妖精的一天，本来就该这么过嘛。」
+	ENDSELECT
+ENDIF
 RETURN 1
 
 ;==================================================
@@ -241,10 +450,13 @@ RETURN 1
 @M_KOJO_EVENT_K6_21(ARG, ARG:1)
 SELECTCASE ARG
 	CASE 1
+		;@AT 测试通过 K6_EV21_恋慕
 		PRINTFORMW 「……奇怪。一到夜里，脑子里就全是%CALLNAME:MASTER%的脸。这、这算什么嘛，害我更睡不着了……」
 	CASE 3
+		;@AT 测试通过 K6_EV21_爱欲
 		PRINTFORMW 「明明是妖精……身体却比谁都诚实。今晚，也把声音都消掉，好好『闹』一场吧♪」
 	CASE 5
+		;@AT 测试通过 K6_EV21_炮友
 		PRINTFORMW 「就当是……只有我们两个能听见的秘密好了。反正妖精嘛，不必那么认真啦。」
 ENDSELECT
 RETURN 1
@@ -255,11 +467,20 @@ RETURN 1
 @M_KOJO_EVENT_K6_26(ARG, ARG:1)
 SELECTCASE ARG
 	CASE 0
+		;@AT 待手动测试 K6_EV26_0
+		SIF K6_MT_ON()
+		PRINTL [[MT K6_EV26_0]]
 		PRINTFORML 「——！？为、为什么会没消音！可恶，关键时候掉链子……！」
 		PRINTFORMW （露娜满脸通红，慌乱地想遮掩，却手忙脚乱地又摔了一跤。）
 	CASE 2
+		;@AT 待手动测试 K6_EV26_2
+		SIF K6_MT_ON()
+		PRINTL [[MT K6_EV26_2]]
 		PRINTFORMW 「别、别看啦——！既、既然都看到了……那你也别想走了！」
 	CASE 4
+		;@AT 待手动测试 K6_EV26_4
+		SIF K6_MT_ON()
+		PRINTL [[MT K6_EV26_4]]
 		PRINTFORMW 「呼……果、果然两个人一起，比一个人偷偷来要……唔，我什么都没说！」
 ENDSELECT
 RETURN 1
@@ -267,6 +488,119 @@ RETURN 1
 ;被撞见自慰时的行动预判（返回 -1/0/1；此处交给引擎默认）
 @M_KOJO_EVENT_K6_26_1(ARGS)
 RETURN 0
+
+;==================================================
+;20,帰宅時（约会归来/送行/邀去房间系）—— 约会归来实际走这里（权威出处 MOVEMENTS/MOVEMENT2.ERB @KITAKU）
+;ARG 1=通常帰宅 2=约会中帰宅 3=玄関先見送り 4=邀你去她房间 5=你答应同行 6=你拒绝
+;==================================================
+@M_KOJO_EVENT_K6_20(ARG, ARG:1)
+LOCAL = 1
+IF LOCAL
+	SELECTCASE ARG
+		CASE 1
+			;普通外出结束、回到门口
+			;@AT 测试通过 K6_EV20_通常帰宅
+			IF TALENT:6:恋人
+				PRINTFORMW 「到、到家啦。……那个，路上小心啊。才、才不是担心你呢。」
+			ELSE
+				PRINTFORMW 「送到这儿就够啦，我又不是小孩子。……哼，先走了。」
+			ENDIF
+		CASE 2
+			;约会归来（约完会一起回来）——她难得不抱怨，用消音掩饰害羞
+			;@AT 测试通过 K6_EV20_约会中帰宅
+			IF TALENT:6:恋人
+				PRINTFORML 「今天……很开心。夜里出来玩，果然还是要和你一起才对。」
+				PRINTFORMW （回程的路上，露娜悄悄把两人的脚步声都消了，只留下并肩的影子慢慢晃。）
+			ELSEIF TALENT:6:恋慕
+				PRINTFORML 「哼，今、今天就当是勉强还算有趣吧……才、才不是特别期待的哦。」
+				PRINTFORMW （话是这么说，她却一直没松开攥着你衣角的那只手。）
+			ELSEIF TALENT:6:思慕 || CFLAG:6:好感度 >= 500
+				PRINTFORMW 「呼……难得白天陪你逛这么久。眼睛是有点酸啦，不过……嗯，还算不错。」
+			ELSE
+				PRINTFORMW 「逛、逛完了？那我先回去补觉啦……大白天的，可真累人。」
+			ENDIF
+		CASE 3
+			;在玄关目送主角离开
+			;@AT 测试通过 K6_EV20_玄関見送り
+			IF TALENT:6:恋人
+				PRINTFORMW 「那个……早、早点再来嘛。（她把「我会等你」这句话，悄悄消了音才敢说出口。）」
+			ELSE
+				PRINTFORMW 「回、回去啦？嗯……路上别摔跤——啊，那是我常干的事，当我没说。」
+			ENDIF
+		CASE 4
+			;她邀你去她房间（ARG:1=目的地）——胆小鬼主动邀请，极别扭
+			;@AT 待手动测试 K6_EV20_邀去房间
+			SIF K6_MT_ON()
+			PRINTL [[MT K6_EV20_邀去房间]]
+			PRINTFORMW 「那、那个……要不要，来我房间坐坐？我、我收集了好多会反光的小石头……才不是想留你多待会儿呢！」
+		CASE 5
+			;你答应同去
+			;@AT 待手动测试 K6_EV20_同去房间
+			SIF K6_MT_ON()
+			PRINTL [[MT K6_EV20_同去房间]]
+			PRINTFORMW 「真、真的要来啊……！那你等等，我先跑回去把乱七八糟的东西藏起来！别偷看啊！」
+		CASE 6
+			;你拒绝
+			;@AT 待手动测试 K6_EV20_拒绝邀请
+			SIF K6_MT_ON()
+			PRINTL [[MT K6_EV20_拒绝邀请]]
+			PRINTFORMW 「……也、也好。反正房间还没铺满月亮呢，等、等下次吧。（她把失落也一起消了音。）」
+	ENDSELECT
+ENDIF
+RETURN 1
+
+;==================================================
+;27,相手からの约会のお誘い（露娜主动约主角）——【占位，待填写；参考慧音 K67 EVENT_27】
+;口上主是 LOCAL（＝露娜）。ARG:1=目的地地点码。
+;胆小鬼露娜「主动约人」本身就是大事件，语气应极度别扭、拐弯抹角、消音壮胆。
+;ARG 0=邀约台词 1=主角接受 2=主角拒绝 3=约去(她)房间 4=房间邀约被接受 5=房间邀约被拒绝
+;==================================================
+@M_KOJO_EVENT_K6_27(ARG, ARG:1)
+LOCAL = 0
+IF LOCAL
+	SELECTCASE ARG
+		CASE 0
+			;【场合】露娜鼓起勇气开口约主角出去（目的地在 ARG:1）。写什么：极度扭捏、
+			;  先消音再小声、找借口（「反正我也要去那边啦，顺、顺路而已！」），可拉桑尼/斯塔当挡箭牌。
+			;@AT 待手动测试 K6_EV27_邀约
+			SIF K6_MT_ON()
+			PRINTL [[MT K6_EV27_邀约]]
+			PRINTFORML
+		CASE 1
+			;【场合】主角答应了。写什么：先愣一下→假装淡定→藏不住雀跃（嘴角压不下去、又绊一跤）。
+			;@AT 待手动测试 K6_EV27_被接受
+			SIF K6_MT_ON()
+			PRINTL [[MT K6_EV27_被接受]]
+			PRINTFORML
+		CASE 2
+			;【场合】主角拒绝了。写什么：强撑面子把失落消掉音（「哼、正好，我也没那么想去！」），
+			;  转身飞走，背影却有点垮。
+			;@AT 待手动测试 K6_EV27_被拒绝
+			SIF K6_MT_ON()
+			PRINTL [[MT K6_EV27_被拒绝]]
+			PRINTFORML
+		CASE 3
+			;【场合】露娜约主角去她房间（「地上的月亮」主题房）。写什么：比出门更害羞，
+			;  强调「只、只是给你看看我收集的反光小石头！别、别想歪了！」
+			;@AT 待手动测试 K6_EV27_约房间
+			SIF K6_MT_ON()
+			PRINTL [[MT K6_EV27_约房间]]
+			PRINTFORML
+		CASE 4
+			;【场合】房间邀约被接受。写什么：慌忙先跑回去收拾/藏东西，嘴上说「随、随便你坐哪」。
+			;@AT 待手动测试 K6_EV27_房间被接受
+			SIF K6_MT_ON()
+			PRINTL [[MT K6_EV27_房间被接受]]
+			PRINTFORML
+		CASE 5
+			;【场合】房间邀约被拒绝。写什么：松一口气与失落并存，「也、也好，反正房间还没铺满月亮呢」。
+			;@AT 待手动测试 K6_EV27_房间被拒绝
+			SIF K6_MT_ON()
+			PRINTL [[MT K6_EV27_房间被拒绝]]
+			PRINTFORML
+	ENDSELECT
+ENDIF
+RETURN 1
 
 ;==================================================
 ;GRAVITY —— 静默的 NPC 移动引力（严禁 PRINT！）
@@ -299,8 +633,15 @@ RETURN 0
 RETURN 0
 
 ;==================================================
-;GIFT —— 收到礼物（自定义参数，需 #DIM/#DIMS）
-;ARG 3=最爱 1=约会回礼 5=偷偷变卖
+;GIFT —— 收到礼物
+;「自定义参数，需 #DIM/#DIMS」：引擎按【位置】传来 5 个实参，但 Emuera 只自动认 ARG/ARG:N/ARGS；
+;  下面这些是作者自取的参数名，必须 #DIM(数值)/#DIMS(字符串) 声明，否则读出来恒为 0/空（pitfall #1）。
+;ARG 分档（引擎 ERB\イベント関連\贈り物関連\贈り物.ERB:310-346；評価点范围 0-999）：
+;  1=角色主动回赠 / 2=珍藏(評価点≥700，每次都发) / 3=刷新「最爱」纪录(≥700 且 ≥历史最高)
+;  4=普通收下(400-699，最常见的一档) / 5=偷偷变卖(<400)
+;⚠ARG2 与 ARG3 会【连发】(贈り物.ERB:320 发完 2、327 判定破纪录再发 3)：
+;  故 ARG2 写完整反应、ARG3 只补一句「刷新纪录」的短话，避免同一次送礼里重复长篇。
+;参考：中性礼物≈500(落 ARG4)，命中一条喜好≈666，≥700 要命中 4 条以上喜好 tag，≥800 极罕见。
 ;==================================================
 @M_KOJO_EVENT_K6_GIFT(ARG, GIFT_ID, 評価点, GIFT_NAME, SENSE)
 #DIM GIFT_ID
@@ -308,18 +649,42 @@ RETURN 0
 #DIMS GIFT_NAME
 #DIMS SENSE
 SELECTCASE ARG
-	CASE 3
-		;最爱——咖啡豆/月亮相关的东西她最喜欢
+	CASE 2
+		;珍藏（≥700）——咖啡豆/月亮相关的东西她最喜欢。这是「她真的很喜欢」的主反应。
+		;顺带解锁日记「藏在枕头下的宝物」页(page5)、记住礼物名与累计件数（见 M_KOJO_K6_日記.ERB）。
+		;置 1081 是幂等的；礼物名/件数每收到一件珍藏级礼物就刷新一次。
+		CFLAG:6:1081 = 1
+		CSTR:6:81 = %GIFT_NAME%
+		CFLAG:6:1082 += 1
 		IF STRCOUNT(SENSE, "飲料/") || STRCOUNT(GIFT_NAME, "咖啡")
+			;@AT 待自动测试 K6_GIFT_珍藏咖啡
 			PRINTFORML 「咖、咖啡豆！你怎么知道……！这可比从茶店偷来的香多了！」
 			PRINTFORMW 「哼，算你有心。……谢、谢谢啦。」
 		ELSE
+			;@AT 待自动测试 K6_GIFT_珍藏其它
 			PRINTFORML 「哇——这个『%GIFT_NAME%』，会不会反光？摆在房间里，像不像掉下来的月亮？」
 			PRINTFORMW 「嘿嘿……我要把房间，变成地上的月亮呢。」
 		ENDIF
+	CASE 3
+		;刷新「最爱」纪录——紧接在 ARG2 的反应之后发，故这里只补一句短的。
+		;@AT 待自动测试 K6_GIFT_最爱
+		PRINTFORMW 「……这个啊，是我收到过的里面，最喜欢的了。才、才不是因为是你送的哦！」
+	CASE 4
+		;普通收下（400-699）——最常见的一档：不讨厌，但也没到珍藏的程度。
+		IF CFLAG:6:好感度 >= 1000
+			;@AT 待自动测试 K6_GIFT_普通心动
+			PRINTFORML 「『%GIFT_NAME%』……嗯，收下了。」
+			PRINTFORMW （露娜嘴上淡淡的，转身却把它仔细揣进了怀里。）
+		ELSE
+			;@AT 待自动测试 K6_GIFT_普通中立
+			PRINTFORML 「唔……『%GIFT_NAME%』啊。谢、谢谢……大概？」
+			PRINTFORMW （她翻来覆去看了半天，好像在认真研究这东西到底能拿来干嘛。）
+		ENDIF
 	CASE 1
-		PRINTFORMW 「回礼？……难得你想得周到。这个『%GIFT_NAME%』，我就收下啦。」
+		;@AT 待自动测试 K6_GIFT_回礼
+		PRINTFORMW 「那个…我上次满月捡到了这个『%GIFT_NAME%』，你如果…如果…总之你就收下嘛。」
 	CASE 5
+		;@AT 待自动测试 K6_GIFT_变卖
 		PRINTFORMW （露娜把『%GIFT_NAME%』掂了掂，趁你没注意，无声无息地塞进了怀里……）
 ENDSELECT
 RETURN 1
@@ -329,10 +694,17 @@ RETURN 1
 ;==================================================
 @RUN_INTO_K6(MAP_ID)
 #DIM MAP_ID
-IF TIME:2 >= 4
+;TIME:2 时段桶：1~4=白天、5(夕)~7(深夜)=夜；夜之妖精夜里才是主场，故 >=5 判夜。
+IF TIME:2 >= 5
 	;夜晚——她的主场
+	;@AT 待手动测试 K6_RUNINTO_夜
+	SIF K6_MT_ON()
+	PRINTL [[MT K6_RUNINTO_夜]]
 	PRINTFORMW 「哟，是%CALLNAME:MASTER%。夜里出来……难得跟我一样呢。要不要，陪我找找掉下来的月光？」
 ELSE
+	;@AT 待手动测试 K6_RUNINTO_昼
+	SIF K6_MT_ON()
+	PRINTL [[MT K6_RUNINTO_昼]]
 	PRINTFORMW 「唔……大白天的居然撞见你。眼睛好刺……我先躲一躲。」
 ENDIF
 RETURN 1
@@ -341,6 +713,7 @@ RETURN 1
 ;角色介绍页（人物一览的口上）
 ;==================================================
 @CHARA_INFO_KOJO_K6
+;@AT 测试通过 K6_CHARAINFO
 IF TALENT:6:恋人
 	PRINTFORML 「光之三妖精之一，负责月亮的那个……现在，也负责%CALLNAME:MASTER%的那个啦。」
 ELSE
@@ -363,6 +736,9 @@ CALL K6_月見夜イベント
 RETURN 1
 
 @K6_月見夜イベント
+;@AT 待手动测试 K6_月見夜
+SIF K6_MT_ON()
+PRINTL [[MT K6_月見夜]]
 PRINTFORML 露娜仰头望着圆得快要溢出来的月亮，难得没有抱怨，只是安静地伸出手。
 PRINTFORML 「十六夜的月亮，是会往下掉东西的哦。」
 PRINTFORML 「掉下来的月光、碎片、还有别的什么……我要把它们全捡回去，铺满整个房间。」

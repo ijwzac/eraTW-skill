@@ -8,37 +8,89 @@
 RETURN 1
 
 ;### 读取前检查：设定总页数与各页解锁条件 ###
+;引擎规格（见 SKILL references/14-日记系统.md）：
+;  页码从 1 起（DIARY:{id}:0 是禁用槽，别用）；DIARY 值 0=未解锁 1=既读 2=当日自动读一页 3=随时可用指令读。
+;  用 3 时必须紧跟 CALL CHARA_DIARY_PAGESETTING(id,页)，否则指令读页循环会在该页 SIF !PAGESET BREAK 立即断页（＝之前"只有一页/空白月亮"的根因）。
+;  解锁条件必须带 == 0 守卫，否则每天覆盖、与既读状态打架。
+;引擎契约（已实测查明，见 SKILL references/14）：
+;  · @DIARY_TEXT 收到的 PAGENUM = PAGESET 登记的【逻辑页号】（就是这里 DIARY:6:N / PAGESETTING(6,N) 的 N），不是物理顺序。
+;  · 指令读页循环只显示已 PAGESET 且状态∈{1,3} 的页；碰到未登记的物理槽会 BREAK（故只登记到第几页就只显示到第几页，不会读到 CASEELSE）。
+;  · 引擎【不自动追加内容】：多页与"随好感度变丰富"全靠这里按条件解锁 + 正文在 @DIARY_TEXT 里写死。
+;  故让日记"有内容且随进程变多"的办法＝把每页写足正文 + 在此按 面识/好感度/关系 逐级解锁。
 @DIARY_BEFORE_CHECK_K6
-;总页数（页码从 0 起，共 3 页）
-MAX_DIARY_PAGE:6:0 = 2
-;解锁：面识后可读第 0 页；好感够读第 1 页；恋慕/恋人才读到第 2 页
-DIARY:6:0 = CFLAG:6:面識
-DIARY:6:1 = (CFLAG:6:好感度 >= 500)
-DIARY:6:2 = (TALENT:6:恋慕 || TALENT:6:恋人)
+;总页数（1..5：1自我介绍/2深夜咖啡/3恶作剧/4关于主角/5挚爱礼物）
+MAX_DIARY_PAGE:6:0 = 5
+;★每次重建物理槽登记：先清空 PAGESET，再按当前解锁条件顺序登记。
+;  为何必须清空重建（自愈）：CHARA_DIARY_PAGESETTING 只往「第一个空物理槽」追加、【从不回收】；
+;  一旦改过页结构或旧存档残留，脏槽会一直指向已无正文的逻辑号 → 指令读显示成「空白页」（本次踩的坑）。
+;  又因 daily 每日只登记状态2的页，而露娜全用状态3（随时指令读、不走 daily），PAGESET 完全由本函数掌控，清空安全。
+;  注：本函数只在每日结束(AFTER TRAIN)被调用一次；指令读不调它，故改动需过一个游戏日才在指令读里生效。
+FOR LOCAL, 1, MAX_DIARY_PAGE:6:0 + 1
+	PAGESET:6:LOCAL = 0
+NEXT
+;逐页：满足解锁条件→（首次）置状态3、（每次都）登记物理槽。SIF DIARY==0 保证不覆盖既读态(1)。
+;第1页 自我介绍：面识即读
+IF CFLAG:6:面識
+	SIF DIARY:6:1 == 0
+		DIARY:6:1 = 3
+	CALL CHARA_DIARY_PAGESETTING(6, 1)
+ENDIF
+;第2页 深夜咖啡：面识即读（让早期就有两页正文）
+IF CFLAG:6:面識
+	SIF DIARY:6:2 == 0
+		DIARY:6:2 = 3
+	CALL CHARA_DIARY_PAGESETTING(6, 2)
+ENDIF
+;第3页 恶作剧日常：好感度 >= 500
+IF CFLAG:6:好感度 >= 500
+	SIF DIARY:6:3 == 0
+		DIARY:6:3 = 3
+	CALL CHARA_DIARY_PAGESETTING(6, 3)
+ENDIF
+;第4页 关于主角：恋慕/恋人
+IF TALENT:6:恋慕 || TALENT:6:恋人
+	SIF DIARY:6:4 == 0
+		DIARY:6:4 = 3
+	CALL CHARA_DIARY_PAGESETTING(6, 4)
+ENDIF
+;第5页 挚爱礼物：收到过「珍藏」档(評価点≥700)的礼物才解锁（由 GIFT 事件 ARG2 置 CFLAG:6:1081；见 M_KOJO_K6_イベント.ERB）
+IF CFLAG:6:1081
+	SIF DIARY:6:5 == 0
+		DIARY:6:5 = 3
+	CALL CHARA_DIARY_PAGESETTING(6, 5)
+ENDIF
 RETURN 1
 
-;### 日记正文 ###
+;### 日记正文 ###（SELECTCASE 按逻辑页号，与上面 DIARY:6:N / PAGESETTING 的 N 一一对应）
 @DIARY_TEXT_K6(PAGENUM, MODE, PAGECOUNT)
 #DIM PAGENUM
 #DIMS MODE
 #DIM PAGECOUNT
 SELECTCASE PAGENUM
-	CASE 0
-		;@AT 待自动测试 K6_DIARY_p0
-		PRINTFORML ◇ 露娜的深夜笔记 ◇
-		IF MODE == "指令"
-			PRINTFORML （字迹歪歪扭扭，还沾着几个像是咖啡渍的圆点。）
-		ELSE
-			PRINTFORML
-		ENDIF
 	CASE 1
-		;@AT 待自动测试 K6_DIARY_p1
+		;@AT 测试通过 K6_DIARY_p1
+		PRINTFORML ◇ 露娜的深夜笔记 ◇
+		SIF MODE == "指令"
+			PRINTFORML （字迹歪歪扭扭，还沾着几个像是咖啡渍的圆点。）
+		PRINTFORML 我是露娜切露德。光之三妖精里，负责「月光」的那个。
+		PRINTFORML 桑尼管日光，斯塔管星光——才、才不是说我这份最不起眼哦，月亮明明很重要的！
+		PRINTFORML 我的能力是把声音消掉。脚步、呼吸，连心跳都能抹得一干二净。
+		PRINTFORMW （所以夜里想悄悄溜进厨房、或者吓唬桑尼一跳，我可是最拿手的。嘿嘿。）
+	CASE 2
+		;@AT 测试通过 K6_DIARY_p2_咖啡
+		PRINTFORML ◇ 深夜的咖啡是禁忌的味道 ◇
+		PRINTFORML 斯塔煮的咖啡，香得过分。凭什么她能喝，我就只能在旁边闻？
+		PRINTFORML 今天趁她去追桑尼，我偷偷灌了一大口……唔，苦得舌头发麻，可是、可是好好喝。
+		PRINTFORML （心跳到现在都还没平复。是咖啡因的错，绝对不是因为做了坏事才这样的。）
+		PRINTFORMW 下次要多加点糖。才不是要养成习惯呢，只、只是稍微研究一下而已啦。
+	CASE 3
+		;@AT 测试通过 K6_DIARY_p3_恶作剧
 		PRINTFORML ◇ 关于恶作剧和那两个人 ◇
 		PRINTFORML 今天桑尼的计划又失败了。明明是她自己迷路的，凭什么怪到我头上。
 		PRINTFORML 斯塔在旁边一边煮咖啡一边看笑话。……那杯咖啡真香。（分我一点会怎样嘛。）
-		PRINTFORMW 殿后又是我。每次落单被抓的也是我。真是的，明明是不死的妖精，怎么净受这种委屈。
-	CASE 2
-		;@AT 待自动测试 K6_DIARY_p2
+		PRINTFORMW 殿后的又是我。每次落单被抓的也是我。真是的，明明是不死的妖精，怎么净受这种委屈。
+	CASE 4
+		;@AT 测试通过 K6_DIARY_p4_主角
 		PRINTFORML ◇ 关于%CALLNAME:MASTER% ◇
 		IF TALENT:6:恋人
 			PRINTFORML 夜里睡不着的时候，只要想到那个人，胸口就会变得暖暖的。
@@ -47,9 +99,26 @@ SELECTCASE PAGENUM
 			PRINTFORML 那个人类，是个不错的观众。至少他不会像桑尼那样，把我的失败拿去到处说。
 			PRINTFORMW 下次……要给他看看，我最帅气的那片弹幕。（才、才不是想被夸呢。）
 		ENDIF
+	CASE 5
+		;挚爱礼物页——由 GIFT 事件(ARG2 珍藏档，評価点≥700)解锁并写入礼物名/件数，内容随之更新（事件驱动日记范例）
+		;@AT 测试通过 K6_DIARY_p5_礼物
+		PRINTFORML ◇ 藏在枕头下的宝物 ◇
+		IF CSTR:6:81 != ""
+			PRINTFORML 收到了『%CSTR:6:81%』。……才、才不是特别开心，只是难得有人肯送我东西嘛。
+		ELSE
+			PRINTFORML 最近收到了一件很中意的礼物。……才、才不是特别开心啦。
+		ENDIF
+		IF CFLAG:6:1082 >= 3
+			PRINTFORML （偷偷数了数，这样的宝物已经攒了{CFLAG:6:1082}件。全塞在枕头底下，谁也不许碰。）
+			PRINTFORMW 要是被桑尼发现，准又要来抢。所以嘘——这可是只有我和这本日记知道的秘密。
+		ELSE
+			PRINTFORMW （我把它悄悄藏进枕头底下，连桑尼和斯塔都没说。这是只属于我一个人的秘密。）
+		ENDIF
 	CASEELSE
-		;@AT 待自动测试 K6_DIARY_空白
-		PRINTFORML （这一页是空白的，只画着一个随手涂的、歪歪的月亮。）
+		;@AT 测试通过 K6_DIARY_空白
+		;兜底空白页只在【指令】翻阅时显示，避免每日模式误打印（参照莉莉卡 K20 修法）
+		SIF MODE == "指令"
+			PRINTFORML （这一页是空白的，只画着一个随手涂的、歪歪的月亮。）
 ENDSELECT
 RETURN 1
 
@@ -71,12 +140,19 @@ RETURN RESULT
 @M_KOJO_MESSAGE_COM_K6_406_1
 LOCAL = 1
 IF LOCAL
-	IF TALENT:6:恋人
-		;@AT 待自动测试 K6_406_恋人
+	;★守卫：时停中/她没醒着（SHIRAHU==0：时停·睡眠·烂醉·衰弱）时她无法吐槽，只走旁白（否则会对"翻日记"做出反应，不合理）
+	IF FLAG:時間停止
+		;@AT 测试通过 K6_406_时停
+		PRINTFORMW （时间静止着，露娜维持着方才的姿势，对你翻看她日记一事浑然不觉。）
+	ELSEIF !SHIRAHU(TARGET)
+		;@AT 测试通过 K6_406_无意识
+		PRINTFORMW （露娜睡得正沉，丝毫没察觉你正悄悄翻看着她的日记。）
+	ELSEIF TALENT:6:恋人
+		;@AT 测试通过 K6_406_恋人
 		PRINTFORML 「诶——！？那、那个不许看啦！里面……写了好多关于你的事呢！」
 		PRINTFORMW （露娜慌忙去抢，脚下照例一绊，连同日记本一起扑进了%CALLNAME:MASTER%怀里。）
 	ELSE
-		;@AT 待自动测试 K6_406_中立
+		;@AT 测试通过 K6_406_中立
 		PRINTFORML 「喂喂，偷看女孩子的日记，可不是绅士的行为哦。」
 		PRINTFORMW 「……不过，反正你也看不懂我的字。哼，随便你啦。」
 	ENDIF

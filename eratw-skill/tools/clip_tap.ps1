@@ -1,4 +1,4 @@
-<#
+﻿<#
 clip_tap.ps1 — real-time clipboard transcript for eraTW.
 
 Emuera auto-copies newly-displayed text to the system clipboard (this install
@@ -44,6 +44,19 @@ if (-not $createdNew) {
     exit 0
 }
 
+# --- foreground-window check (only capture while the game is focused) ---------
+# Avoids grabbing the clipboard that belongs to some OTHER app (browser, editor…)
+# the player alt-tabbed to. Only records when the focused window's process == WatchPid.
+Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public static class Win32Focus {
+  [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+  public static uint Pid() { uint p; GetWindowThreadProcessId(GetForegroundWindow(), out p); return p; }
+}
+'@
+
 $enc   = New-Object System.Text.UTF8Encoding($false)   # UTF-8, no BOM (safe to append)
 $last  = $null
 $start = Get-Date
@@ -57,6 +70,17 @@ while ($true) {
     if ($WatchPid -gt 0 -and -not (Get-Process -Id $WatchPid -ErrorAction SilentlyContinue)) { break }
     if ($StopFile -and (Test-Path $StopFile)) { break }
     if (((Get-Date) - $start).TotalSeconds -gt $MaxSeconds) { break }
+
+    # only capture while the game window is the foreground app (skip other apps' clipboard).
+    # fail-safe: if the API returns 0 (couldn't resolve), capture anyway rather than lose data.
+    # (The game's debug console is the SAME process as the game window, so focusing it still counts.)
+    if ($WatchPid -gt 0) {
+        $fgPid = [Win32Focus]::Pid()
+        if ($fgPid -gt 0 -and $fgPid -ne $WatchPid) {
+            Start-Sleep -Milliseconds $IntervalMs
+            continue
+        }
+    }
 
     $txt = $null
     try { $txt = Get-Clipboard -Raw -ErrorAction Stop } catch { $txt = $null }

@@ -16,7 +16,7 @@
 - **交付前**：①注释 会話 AUTOTEST 钩子 + 删 `AUTOTEST.ERB`；②**翻转 `@K{id}_MT_ON()`→`RETURNF 0`**（先汇报还剩多少 `待手动测试`/`测试失败`；标记可带守护静默留存、不必强删）；③还原 `emuera.config`（备份 `emuera.config.bak_clip`）。bat 只提醒、不自动关钩子。
 
 ## SKILL 结构（`learning/eratw-skill/`）
-- `SKILL.md` 主体（§0 导航含资料查找表 / §1 常见坑含 #13 写命令前 grep 清单 / §2 校验 / §9.5 内容自查①-④…）。
+- `SKILL.md` 主体（**§0.7 ⛔作业边界(写操作只许落在口上文件夹/禁系统级永久操作/不确定就问)** / **§0.8 HANDOFF.md 自觉维护(context压缩与换session接手)** / §0 导航含资料查找表 / §1 常见坑含 #13 写命令前 grep 清单 / §2 校验 / §9.5 内容自查①-④…）。
 - `references/01-16`：01 标签目录 / 02 状态总线 / 03 helper / 04 DSL / 05 事件ARG(含约会结束3路径 + ⭐GIFT ARG分档) / 06 recipe / 07 其它 / 08 角色ID / 09 人设 / 10 编码工具 / 11 autotest流水线(§11.8 MT总开关 / §11.13 覆盖交叉核对 / §11.14 哨兵一键arm+⚠FLAGSETTING调用频率 / §11.15 纯冒烟TID) / **12 命令速查** / **13 高频惯用法** / **14 日记系统** / **15 依赖系** / **16 刻印系统**。
 - `references/data/`：权威 CSV（Train/TFLAG/CFLAG/Item/Chara…）+ **`data/engine/`**（KOJO_MESSAGE.ERB 分发器 / COMMON.ERB helper库 / EVENT_MESSAGE_COM300+400 命令语义 + README）。
 - `reference-kojo/`：`luna-K6/`(露娜同步副本) / `reimu/`(K1样例) / `口上テンプレ/`(官方空模板)。

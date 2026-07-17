@@ -11,7 +11,7 @@ A skill for helping a user write or modify per-character dialogue scripts for **
 
 ---
 
-## 0. Read this first — Role, mode, output language, and where to find more material
+## 0. Read this first — 作业边界(§0.7 ⛔) / HANDOFF(§0.8) / Role, mode, output language, and where to find more material
 
 ### 0.1 Your role
 
@@ -111,6 +111,54 @@ The Emuera parser skips everything between `[SKIPSTART]` and `[SKIPEND]` lines (
 2. **Optional new-API features.** Wrap any `@KOJO_CUSTOM_BUTTON_*` / `@KOJO_CUSTOM_TALENT_*` block when you're not sure the user's engine version supports it; the file then loads cleanly on older engines too.
 
 **When you write new code**: prefer `;`-prefixed line comments for short notes; reach for `[SKIPSTART]/[SKIPEND]` only when you genuinely want a multi-line block that's parseable but disabled. **When you read existing code**: don't assume a SKIPSTART block is "dead code to delete" — the author may be intentionally parking work-in-progress there.
+
+### 0.7 ⛔ 作业边界：写操作【只能】落在口上文件夹里
+
+> 本节优先级高于本 skill 里的一切「怎么写得更好」。违反它造成的损失，用户往往几十小时后才发现、且不可逆。
+
+**为什么这条这么硬**：用户的游戏目录里，属于「你的东西」的**只有那一个角色的口上文件夹**。其余全是**别人的资产**——引擎代码、上千个第三方作者的口上、以及用户玩了几百小时的存档。你改坏其中任何一样，用户可能在很久以后才撞见，那时已经无从追溯是谁改的。
+
+**允许写**：`ERB/口上・メッセージ関連/個人口上/<你正在写的角色目录>/` 之内。
+
+**禁止写**（除非用户**明确、当次**要求）：
+
+- **引擎侧的一切**：`COMF*`、`COMMON.ERB`、`KOJO_MESSAGE.ERB`、`SOURCE*.ERB`、`DIM.ERH`、`*.CSV` ——**即使你确信引擎有 bug、即使从那儿改明显更省事**。
+- **别人的口上**：`個人口上/` 下其它角色的目录。
+- **玩家资产**：`sav/`（存档）、`emuera.config`、`lazyloading.dat` 之外的运行期文件。
+- **仓库/系统层面**：`git push` / `git reset --hard` / 改 git 全局配置。
+
+**发现问题在口上之外时的正确做法**——报告，别动手。给出：①根因与证据（文件:行号）；②用户可以自己在调试台执行的命令，或可以自己改的那一处；③改了会有什么后果。**让用户决定**。
+> 实例：露娜掏耳朵没反应，真因是引擎 `COMF305` 的体型闸（幼児体型角色必失败）。正确处置＝告诉用户根因 + 给出 `TALENT:0:体型 = 0` 这类调试台自查法，**而不是**去改 `COMF305`。
+
+**禁止有系统级永久影响的操作**（同样：除非用户明确要求）：改系统设置/环境变量/注册表、下载或安装任何 app、装库（`pip install` / `npm i` / `choco` …）、改 PATH、装字体、关防火墙/杀软、开机自启。**本 skill 的全部工作只需要读写文本文件**——真需要装东西，先说明为什么、装什么、有什么影响，等用户点头。
+
+**授权不会外溢**：「上次你让我改过 `emuera.config`」**不等于**这次可以改存档。每一次越界都要重新问。
+
+**破坏性/不可逆动作前先确认**：删除或覆盖文件、批量改存档、`push`。**并且动手前先看一眼目标**——如果内容和用户的描述对不上、或者那不是你创建的文件，**先说出来，别动手**。若用户明确要你改口上外的东西（如 `emuera.config`），**先备份并告诉用户备份在哪**。
+
+**一旦不确定，就停下来问。** 宁可多问一句显得啰嗦，也不要「我觉得应该没问题」。这条**没有**「但这次情况特殊」的例外。
+
+### 0.8 HANDOFF.md —— 你自己的记忆文件（务必自觉维护）
+
+**在口上文件夹里维护一个 `HANDOFF.md`。**（已经有了就更新它，**别新建第二个**。）
+
+**为什么需要它**：你的 context 是会满的——满了就会被**压缩（compact）**，压缩后你会丢掉大量细节；session 也可能因为意外关闭而整个消失，换一个 session（甚至换一个 AI）来接手。**用户未必知道 context 压缩这回事，所以别指望他们提醒你写。这是你自己的责任。**
+
+**写给谁看**：假设读者是**对本次会话一无所知的接手者**（很可能就是失忆之后的你自己）。所以：别用只有此刻才懂的缩写、代号、「上面说的那个方案」。把话说完整。用**中文**（用户也会读它）。
+
+**该写什么**（＝代码里看不出来的东西）：
+
+- **用户的重要指示与偏好**，尤其「铁律」级的——以及**为什么**。
+- **当前任务与状态**：在做什么、做到哪了、下一步是什么。
+- **待办**：办完就删掉，或收敛成一句结论。别让它长成一份考古报告。
+- **踩过的坑与教训**：特别是那些「查了半天才发现」的引擎事实、以及**试过但失败的路子**（这个最省未来的时间——否则接手者会原样再踩一遍）。
+- **关键路径**、以及**验证/测试怎么跑**。
+
+**不该写什么**：代码本身就能告诉你的东西（文件清单、每个函数干嘛、目录结构）。那是浪费——接手者去读代码就好。要写的是代码**回答不了**的：为什么这么设计、用户到底要什么、哪条路已经证明走不通。
+
+**什么时候更新**：有重要发现、用户给了新指示、完成一个阶段性工作——**当场就更新**，别攒到 context 快满时才想起来（那时你可能已经丢掉细节了）。**压缩触发后回来的第一件事，就是读它。**
+
+> 它不会被引擎加载（引擎只认 `.ERB`），所以留在口上文件夹里对游戏零影响，发布时删不删都行。
 
 ---
 
@@ -634,7 +682,7 @@ For sex commands (60-77, 95, plus 逆アナル 90-95), add intermediate guards o
 
 Every early-return condition above the TALENT cascade *suppresses all relationship content below it*. For broad conditions (room class, weather, time-of-day), prefer RAND-gating or moving the condition inside relationship branches as flavor sub-conditions, instead of as an early-return blocker.
 
-### 9.5 内容自查：生成完一段对话后，回头过一遍这两点
+### 9.5 内容自查：生成完一段对话后，回头过一遍这四点
 
 写完一条命令/事件的台词后，在交还前**自己审一遍**（这是内容质量检查，不是 §2 的机械校验）：
 
@@ -736,6 +784,10 @@ Three common workflows. **Full worked examples** with file scaffolds, exact labe
 ---
 
 ## 11. Final reminders for you (the helper LLM)
+
+> **这两条压过下面所有内容：**
+> - **⛔ 写操作只落在口上文件夹里（§0.7）**，且不做有系统级永久影响的操作——除非用户明确、当次要求。**不确定就停下来问。** 引擎侧的问题：报告根因 + 给用户自查/自改的办法，别自己动手。
+> - **自觉维护口上文件夹里的 `HANDOFF.md`（§0.8）**——你的 context 会被压缩、session 可能丢失，而用户不会提醒你。当场更新；压缩后回来第一件事是读它。
 
 1. **Structure first, prose later.** Always scaffold files and label names *before* asking the user about content.
 2. **Default to the standard cascade** (§9). Only add custom guards when the user's persona explicitly requires.

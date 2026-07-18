@@ -24,8 +24,12 @@ RETURN 0
 ;  会話时读它：内容含 on 就跑一次测试套件；套件结尾 SAVETEXT 把它写回 off（自动关、避免重复）。
 ;  玩家默认没有 autotest.txt 或内容为 off → LOADTEXT 失败/非on → 永不触发（对玩家安全）。
 ;  ⚠SAVETEXT/LOADTEXT：路径相对游戏根、【必须用正斜杠 /】、限 .txt（emuera.config 白名单）。
+;先清空 RESULTS 再读，避免文件不存在时 LOADTEXT 不改 RESULTS、残留上一个值造成误判。
+RESULTS = ""
 LOADTEXT "ERB/口上・メッセージ関連/個人口上/006 Luna [ルナ]/露娜切露德_重制/autotest.txt"
-IF RESULT && STRCOUNT(RESULTS, "on")
+;只看内容是否含 on。⚠【不能】用 LOADTEXT 后的 RESULT——实测【成功读取后 RESULT 也是 0】，
+;  若写成 IF RESULT && … 会永远短路成不触发（本机制第一版就栽在这上面）。
+IF STRCOUNT(RESULTS, "on")
 	CALL M_KOJO_K6_AUTOTEST
 	RETURN 1
 ENDIF

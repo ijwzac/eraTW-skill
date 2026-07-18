@@ -85,29 +85,21 @@ CASE "CLIENT"
 			CASE "想要学習料理"
 				SELECTCASE SCENE
 					CASE "依頼提示時"
-						;@AT 待手动测试 K6_IRAI_料理_拜托
-						SIF K6_MT_ON()
-						PRINTL [[MT K6_IRAI_料理_拜托]]
+						;@AT 测试通过 K6_IRAI_料理_拜托
 						PRINTFORML 「我……我想学会煮咖啡。教教我嘛，%CALLNAME:MASTER%？」
 						PRINTFORMW 「斯塔都会煮了，就我不会……哼，很不甘心的。」
 					CASE "成功報告時"
-						;@AT 待手动测试 K6_IRAI_料理_感谢
-						SIF K6_MT_ON()
-						PRINTL [[MT K6_IRAI_料理_感谢]]
+						;@AT 测试通过 K6_IRAI_料理_感谢
 						PRINTFORMW 「嗯……好像有点会了？下次，我煮给你喝。……才、才不是要报答你呢。」
 				ENDSELECT
 			CASE "誰来告訴我！"
 				SELECTCASE SCENE
 					CASE "依頼提示時"
-						;@AT 待手动测试 K6_IRAI_解惑_拜托
-						SIF K6_MT_ON()
-						PRINTL [[MT K6_IRAI_解惑_拜托]]
+						;@AT 测试通过 K6_IRAI_解惑_拜托
 						PRINTFORML 「%CALLNAME:MASTER%，有个东西我怎么都想不明白……你、你懂的多，教教我？」
 						PRINTFORMW 「唔，别笑我啊。妖精本来就不太爱动脑子嘛。」
 					CASE "成功報告時"
-						;@AT 待手动测试 K6_IRAI_解惑_感谢
-						SIF K6_MT_ON()
-						PRINTL [[MT K6_IRAI_解惑_感谢]]
+						;@AT 测试通过 K6_IRAI_解惑_感谢
 						PRINTFORMW 「原来是这样啊……哦——！懂了懂了。谢啦，%CALLNAME:MASTER%。」
 				ENDSELECT
 			CASE "大掃除還沒結束"
@@ -152,14 +144,10 @@ CASE "CLIENT"
 			CASE "想吃美味的魚"
 				SELECTCASE SCENE
 					CASE "依頼提示時"
-						;@AT 待手动测试 K6_IRAI_想吃鱼_拜托
-						SIF K6_MT_ON()
-						PRINTL [[MT K6_IRAI_想吃鱼_拜托]]
+						;@AT 测试通过 K6_IRAI_想吃鱼_拜托
 						PRINTFORMW 「突然好想吃鱼哦……那种很鲜的。%CALLNAME:MASTER%，能帮我弄一条来吗？」
 					CASE "成功報告時"
-						;@AT 待手动测试 K6_IRAI_想吃鱼_感谢
-						SIF K6_MT_ON()
-						PRINTL [[MT K6_IRAI_想吃鱼_感谢]]
+						;@AT 测试通过 K6_IRAI_想吃鱼_感谢
 						PRINTFORMW 「哇，好香……谢谢你！嘿嘿，果然还是别人弄来的鱼最好吃。」
 				ENDSELECT
 			CASE "正在砍柴"

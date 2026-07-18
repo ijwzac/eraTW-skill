@@ -39,6 +39,7 @@ param(
   [Parameter(Mandatory)][string]$CliLog,
   [string]$KojoDir,
   [string]$GameRoot,
+  [string]$Cid,        # 只处理该角色号(如 6)的 AUTOTEST 块；多口上同轮时用来隔离，防止别的口上的 END 掩盖本角色的崩溃判定
   [switch]$DryRun
 )
 
@@ -64,9 +65,20 @@ if (-not $KojoDir)                        { Write-Host "No -KojoDir and no [[KOJ
 if (-not (Test-Path -LiteralPath $KojoDir)) { Write-Host "Kojo folder not found: $KojoDir" -ForegroundColor Red; return }
 
 # --- 3. parse the transcript for BEGIN/OK markers (in order) ---
+# Multi-kojo isolation: with -Cid, scan ONLY that character's own AUTOTEST block, so
+# another kojo's END sentinel can't mask this one's halt (END detection is otherwise global).
+$scanText = $log
+if ($Cid) {
+  $blk = [regex]::Match($log, "(?s)=====AUTOTEST_K${Cid}_BEGIN=====.*?=====AUTOTEST_K${Cid}_END=====")
+  if ($blk.Success) { $scanText = $blk.Value }
+  else {
+    $bg = [regex]::Match($log, "(?s)=====AUTOTEST_K${Cid}_BEGIN=====.*")
+    if ($bg.Success) { $scanText = $bg.Value }   # BEGIN but no own END (halted): take from BEGIN to end
+  }
+}
 $begin = @{}; $ok = @{}
 $lastTid = $null; $lastKind = $null
-foreach ($m in [regex]::Matches($log, '\[\[TID\s+(\S+)\s+(BEGIN|OK)\]\]')) {
+foreach ($m in [regex]::Matches($scanText, '\[\[TID\s+(\S+)\s+(BEGIN|OK)\]\]')) {
   $tid = $m.Groups[1].Value; $kind = $m.Groups[2].Value
   if ($kind -eq 'BEGIN') { $begin[$tid] = $true } else { $ok[$tid] = $true }
   $lastTid = $tid; $lastKind = $kind      # Matches() yields in document order; keep the final one
@@ -74,7 +86,8 @@ foreach ($m in [regex]::Matches($log, '\[\[TID\s+(\S+)\s+(BEGIN|OK)\]\]')) {
 
 # END sentinel present => the whole battery ran to completion (no halt anywhere).
 # In that case a missing OK is pure clipboard loss, NOT a failure — so every BEGIN'd TID passes.
-$endSeen = [regex]::IsMatch($log, 'AUTOTEST_\w+_END')
+# ($scanText is Cid-isolated when -Cid is given, so this only sees THIS character's END.)
+$endSeen = [regex]::IsMatch($scanText, 'AUTOTEST_\w+_END')
 
 $verdict = @{}
 foreach ($tid in $begin.Keys) {

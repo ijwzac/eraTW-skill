@@ -45,10 +45,10 @@ Write-Host "  游戏目录 : $root"
 Write-Host "  记录文件 : $log"
 Write-Host ""
 Write-Host "  请选择要启动的游戏版本："
-Write-Host "    [1] 开发者版(调试模式)  —— 想要Debug窗口与Debug信息用它）"
+Write-Host "    [1] 开发者版(调试模式)  —— 想要 Debug 窗口与调试信息就用它"
 Write-Host "    [2] 普通玩家版          —— 平时游玩用它"
-Write-Host "  两个版本均可以触发手动测试与自动测试功能"
-Write-Host "  Debug窗口能输入作弊指令，具体可询问AI"
+Write-Host "  两个版本都能触发手动测试与自动测试（自动测试靠哨兵文件 arm，不必非得用调试台）。"
+Write-Host "  Debug 窗口能输入作弊/调试指令，具体可询问 AI。"
 Write-Host ""
 $choice = Read-Host "  输入 1 或 2 后回车"
 if     ($choice -eq '1') { $exe = $devName; $exeArgs = @('-debug'); $modeName = '开发者版(调试)' }
@@ -181,6 +181,47 @@ function Get-AutotestBlock {
     $m = [regex]::Matches($txt, '(?s)=====AUTOTEST_(\w+?)_BEGIN=====.*?=====AUTOTEST_\1_END=====')
     if ($m.Count -gt 0) { return $m[$m.Count - 1].Value } else { return $null }
 }
+function Get-KojoRel([string]$blockText) {
+    $km = [regex]::Match($blockText, '(?m)^\s*\[\[KOJODIR\s+(.+)\]\]\s*$')
+    if ($km.Success) { return $km.Groups[1].Value.Trim() } else { return '' }
+}
+function Get-AutotestBlocks {
+    # 返回本轮 cliplog 里【所有】口上的 AUTOTEST 块（可能多个角色同轮跑），按出现顺序。
+    # 每项：@{ Cid=角色号; Raw=块文本; KojoRel=块内[[KOJODIR]]相对路径; Halted=有BEGIN无自己的END(崩溃) }
+    if (-not (Test-Path $log)) { return @() }
+    $txt = [System.IO.File]::ReadAllText($log, $utf8n)
+    $res = [ordered]@{}
+    # 完整块（BEGIN...自己的 END 成对）
+    foreach ($m in [regex]::Matches($txt, '(?s)=====AUTOTEST_(\w+?)_BEGIN=====.*?=====AUTOTEST_\1_END=====')) {
+        $cid = ($m.Groups[1].Value -replace '^[Kk]','')
+        if ($res.Contains($cid)) { continue }
+        $res[$cid] = @{ Cid = $cid; Raw = $m.Value; KojoRel = (Get-KojoRel $m.Value); Halted = $false }
+    }
+    # 崩溃块（有 BEGIN 但没有配对 END）——游戏崩溃会 halt，故它必是日志里最后的 AUTOTEST，取到尾即可
+    foreach ($m in [regex]::Matches($txt, '=====AUTOTEST_(\w+?)_BEGIN=====')) {
+        $tag = $m.Groups[1].Value; $cid = ($tag -replace '^[Kk]','')
+        if ($res.Contains($cid)) { continue }
+        $bg = [regex]::Match($txt, "(?s)=====AUTOTEST_${tag}_BEGIN=====.*")
+        $raw = if ($bg.Success) { $bg.Value } else { '' }
+        $res[$cid] = @{ Cid = $cid; Raw = $raw; KojoRel = (Get-KojoRel $raw); Halted = $true }
+    }
+    return @($res.Values)
+}
+function Write-SessionSummary($sum) {
+    # 把本轮会话小结追加到 cliplog 末尾：编译错误/运行崩溃/各口上自动测试结果+是否回写/手动测试+是否回写。
+    $L = @()
+    $L += "===== [启动器附加] 本轮测试会话小结（$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')）====="
+    $L += ("· 编译/脚本错误：{0}" -f $(if ($sum.CompileError) { '是 —— 游戏未能正常启动（见上）' } else { '否' }))
+    $L += ("· 运行中崩溃：{0}"   -f $(if ($sum.RuntimeCrash) { '是 —— 见上方并入的 emuera.log 堆栈' } else { '否' }))
+    $L += "· 自动测试 AUTOTEST："
+    if (-not $sum.Auto -or $sum.Auto.Count -eq 0) { $L += "    （本轮未跑）" }
+    else { foreach ($a in $sum.Auto) { $L += ("    - K{0}：{1}；回写：{2}" -f $a.Cid, $a.Result, $a.Written) } }
+    $L += "· 手动测试："
+    if (-not $sum.Manual -or $sum.Manual.Count -eq 0) { $L += "    （本轮无触发的手动标记）" }
+    else { foreach ($h in $sum.Manual) { $L += ("    - K{0}：触发 {1} 个标记；回写：{2}" -f $h.Cid, $h.Count, $h.Written) } }
+    $L += "===== 小结结束 ====="
+    [System.IO.File]::AppendAllText($log, "`r`n" + ($L -join "`r`n") + "`r`n", $utf8n)
+}
 function Get-ManualTids {
     if (-not (Test-Path $log)) { return @() }
     $txt = [System.IO.File]::ReadAllText($log, $utf8n)
@@ -190,13 +231,19 @@ function Get-ManualTids {
     }
     return @($seen.Keys)
 }
-function Write-Result([string]$at, [string[]]$tids, [bool]$final) {
+function Write-Result([array]$atBlocks, [string[]]$tids, [bool]$final) {
     $s = @()
     $s += "=== eraTW 测试结果（自动生成；把本文件整段发给 AI 即可评审）==="
     $s += ("生成时间：" + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))
     $s += ""
     $s += "【一、自动测试 AUTOTEST 输出】"
-    if ($at) { $s += $at } else { $s += "  （本次运行未包含 AUTOTEST）" }
+    if ($atBlocks -and $atBlocks.Count) {
+        foreach ($b in $atBlocks) {
+            $s += ("---- 口上 K{0}{1} ----" -f $b.Cid, $(if ($b.Halted) { '（中途崩溃 halt！）' } else { '' }))
+            $s += $b.Raw
+            $s += ""
+        }
+    } else { $s += "  （本次运行未包含 AUTOTEST）" }
     $s += ""
     $s += "【二、手动测试 · 实录中已触发的分支】（去重，共 $($tids.Count) 处）"
     if ($tids.Count) { $tids | ForEach-Object { $s += "  $_" } } else { $s += "  （本次无）" }
@@ -238,8 +285,8 @@ while (-not $game.HasExited) {
         $sz = (Get-Item $log).Length
         if ($sz -ne $lastSize) {
             $lastSize = $sz
-            $at = Get-AutotestBlock
-            if ($at) { $atShown = $true }
+            $at = Get-AutotestBlocks
+            if ($at.Count) { $atShown = $true }
             Write-Result $at (Get-ManualTids) $false
         }
         foreach ($ln in (Get-Content $log -Tail 20 -Encoding UTF8)) {
@@ -319,6 +366,7 @@ if ($compileError) {
     Write-Host "   文件：$log" -ForegroundColor Yellow
     Write-Host ""
     Write-Host "   （游戏没有真正跑起来，故跳过自动/手动测试统计——那些结果此时是空的、只会误导。）" -ForegroundColor DarkGray
+    Write-SessionSummary @{ CompileError = $true; RuntimeCrash = $false; Auto = @(); Manual = @() }
     Read-Host "`n  按回车关闭"
     exit 0
 }
@@ -340,130 +388,131 @@ if ($emuHasCrash) {
     Write-Host ""
 }
 
-$atBlock = Get-AutotestBlock
-$mtTids  = Get-ManualTids
-Write-Result $atBlock $mtTids $true
+$atBlocks = Get-AutotestBlocks
+$mtTids   = Get-ManualTids
+Write-Result $atBlocks $mtTids $true
 Write-Host ""
-if ($atBlock) { Write-Host "  ✓ AUTOTEST 结果已写入 test_result.txt" -ForegroundColor Green } else { Write-Host "  · 本次无 AUTOTEST 段。" }
+if ($atBlocks.Count) { Write-Host ("  ✓ AUTOTEST 结果已写入 test_result.txt（{0} 个口上）" -f $atBlocks.Count) -ForegroundColor Green } else { Write-Host "  · 本次无 AUTOTEST 段。" }
 Write-Host ("  ✓ 手动测试：实录中共发现 {0} 处已触发的对话标记。" -f $mtTids.Count) -ForegroundColor Green
 Write-Host "     结果文件（可发给 AI）：$resFile" -ForegroundColor Yellow
 
-# ================= 自动测试 AUTOTEST 回写（调用 at_update.ps1）=================
+# 本轮小结累积器（最后写进 cliplog 末尾）。编译错误已在前面 exit，不会到这里；$emuHasCrash 是运行中崩溃。
+$sum = @{ CompileError = $false; RuntimeCrash = $emuHasCrash; Auto = @(); Manual = @() }
+
+# ================= 自动测试 AUTOTEST 回写（逐口上，调 at_update.ps1 -Cid 隔离）=================
 Write-Host ""
 Write-Host "  ──────────────── 自动测试 AUTOTEST 结果 ────────────────" -ForegroundColor Cyan
-# 判定按 END 哨兵门控（与 at_update.ps1 一致）：
-#   $atBlock 有   → BEGIN 与 END 哨兵成对捕获 → 测试套件完整跑完没崩 → 每个打了 BEGIN 的分支都算通过（OK 丢了也无妨）。
-#   $atBlock 无但日志出现过 BEGIN 哨兵 → 测试套件中途崩溃(halt)。
-#   两者皆无 → 本轮压根没跑自动测试。
-$logTxt   = if (Test-Path $log) { [System.IO.File]::ReadAllText($log, $utf8n) } else { '' }
-$atStarted = [regex]::IsMatch($logTxt, '=====AUTOTEST_\w+_BEGIN=====')
-if (-not $atBlock) {
-    if ($atStarted) {
-        Write-Host "  [!] 看到自动测试开始了(BEGIN 哨兵)，却没看到结束(END 哨兵) —— 测试套件很可能中途崩溃(halt)。" -ForegroundColor Red
-        Write-Host "      请看 test_result.txt 正文，最后一条 [[TID ... BEGIN]] 之后的分支即崩溃点。本次跳过回写。" -ForegroundColor Yellow
-    } else {
-        Write-Host "  · 本轮没有跑自动测试（可能只做了手动测试），跳过自动测试回写。" -ForegroundColor DarkGray
-    }
+if ($atBlocks.Count -eq 0) {
+    Write-Host "  · 本轮没有跑自动测试（可能只做了手动测试），跳过自动测试回写。" -ForegroundColor DarkGray
 } else {
-    $bset = @{}
-    foreach ($m in [regex]::Matches($atBlock, '\[\[TID\s+(\S+)\s+BEGIN\]\]')) { $bset[$m.Groups[1].Value] = $true }
-    $atCid = ''
-    foreach ($k in $bset.Keys) { if ($k -match '^K(\d+)_') { $atCid = $Matches[1]; break } }
-    Write-Host ("  END 哨兵已捕获 → 测试套件完整跑完、无中途崩溃；共 {0} 个分支，全部通过。" -f $bset.Count) -ForegroundColor Green
-    Write-Host "  （个别 OK 若被剪贴板边界丢掉也不算失败——END 在就说明整段都跑到了。）" -ForegroundColor DarkGray
-    Write-Host "  是否把自动测试结果回写口上代码？（;@AT -> 测试通过）" -ForegroundColor Cyan
-    $doAt = Read-Host "  输入 Y 回车执行；其它则跳过"
-    if ($doAt -match '^[Yy]') {
-        $rel = $null
-        $mk = [regex]::Match($atBlock, '(?m)^\s*\[\[KOJODIR\s+(.+)\]\]\s*$')
-        if ($mk.Success) { $rel = $mk.Groups[1].Value.Trim() }
-        $atDef = if ($rel) { Join-Path $root ($rel -replace '/','\') } else { '' }
-        if ($atDef) { Write-Host ("  从 AUTOTEST 首行识别到口上文件夹：`n     {0}" -f $atDef) }
-        else        { Write-Host "  没能从日志自动识别口上文件夹（AUTOTEST 未打印 [[KOJODIR]] 行）。" -ForegroundColor Yellow }
-        Write-Host "  （若上面识别错了，请粘贴口上文件夹的【绝对路径】——里面装着 .ERB 文件、路径用 \ 分段）" -ForegroundColor DarkGray
-        $ans = Read-Host "  确认就改这个文件夹吗？(Y=是 / P=打开文件夹选择窗口 / 或粘贴绝对路径)"
-        $atTgt = $null
-        if     ($ans -match '^[Yy]$' -and $atDef) { $atTgt = $atDef }
-        elseif ($ans -match '^[Pp]$') { $atTgt = Pick-Folder }
-        elseif ($ans -and $ans -notmatch '^[Yy]$') { $atTgt = $ans.Trim('"').Trim() }
-        if     (-not $atTgt) { Write-Host "  已跳过自动测试回写。" -ForegroundColor DarkGray }
-        elseif (-not (Test-Path -LiteralPath $atTgt)) { Write-Host "  路径不存在，跳过：$atTgt" -ForegroundColor Red }
-        else {
-            Write-Host "  回写自动测试结果中 ..." -ForegroundColor Cyan
-            & powershell -NoProfile -ExecutionPolicy Bypass -File $atup -CliLog $log -KojoDir $atTgt
+    if ($atBlocks.Count -gt 1) { Write-Host ("  本轮有 {0} 个口上跑了自动测试，将逐个处理、互不干扰。" -f $atBlocks.Count) -ForegroundColor Cyan }
+    foreach ($blk in $atBlocks) {
+        $cid = $blk.Cid
+        $begins = ([regex]::Matches($blk.Raw, '\[\[TID\s+\S+\s+BEGIN\]\]')).Count
+        Write-Host ""
+        Write-Host ("  === 自动测试 K$cid ===") -ForegroundColor Cyan
+        if ($blk.Halted) {
+            Write-Host "  [!] 看到 BEGIN 哨兵、却没看到本口上的 END 哨兵 —— 测试套件中途崩溃(halt)。" -ForegroundColor Red
+            Write-Host "      test_result.txt 里本口上最后一条 [[TID ... BEGIN]] 之后的分支即崩溃点。仍可回写（其余分支判通过、崩的那条判失败）。" -ForegroundColor Yellow
+            $result = "中途崩溃(halt)，$begins 个分支到达"
+        } else {
+            Write-Host ("  END 哨兵已捕获 → 测试套件完整跑完、无中途崩溃；共 {0} 个分支，全部通过。" -f $begins) -ForegroundColor Green
+            Write-Host "  （个别 OK 若被剪贴板边界丢掉也不算失败——END 在就说明整段都跑到了。）" -ForegroundColor DarkGray
+            $result = "完整跑完，$begins 个分支通过"
         }
-    } else { Write-Host "  已跳过自动测试回写。" -ForegroundColor DarkGray }
-    # 【不再自动注释钩子】：本工具并不检查那些【尚未被测试套件覆盖】的 待自动测试 分支，
-    # 贸然关钩子会让人误以为全部测过了。改成提醒用户自行决定。
-    $armCid = if ($atCid) { $atCid } else { '{角色号}' }
-    Write-Host ""
-    Write-Host "  提醒：" -ForegroundColor Cyan
-    Write-Host ("    · 本存档里自动测试不会再自动触发了（已跑过，待命位 CFLAG:{0}:1099 已置 2）。哨兵文件只让【还没跑过】的存档待命，不会重复触发。" -f $armCid)
-    Write-Host ("      想用同一个存档再跑一轮：调试控制台输入  CFLAG:{0}:1099 = 1  再点「会話」；换一个没跑过的存档则下次启动照样选【启用】即可。" -f $armCid)
-    Write-Host "    · 口上里可能还有【没被这次测试套件覆盖到】的 待自动测试 分支，本工具不检查这些，请勿以为已全部测完。"
-    Write-Host "    · 发布口上前，请记得手动注释掉 日常系コマンド.ERB 里那段 AUTOTEST 钩子、并删除 AUTOTEST.ERB（也可以直接让 AI 帮你处理）。" -ForegroundColor Yellow
+        Write-Host ("  是否把 K$cid 的自动测试结果回写口上代码？（;@AT -> 测试通过/失败）") -ForegroundColor Cyan
+        $doAt = Read-Host "  输入 Y 回车执行；其它则跳过"
+        $written = '已跳过'
+        if ($doAt -match '^[Yy]') {
+            $rel = $blk.KojoRel
+            $atDef = if ($rel) { Join-Path $root ($rel -replace '/','\') } else { '' }
+            if ($atDef) { Write-Host ("  从 AUTOTEST 首行识别到 K$cid 的口上文件夹：`n     {0}" -f $atDef) }
+            else        { Write-Host "  没能从日志自动识别口上文件夹（该 AUTOTEST 未打印 [[KOJODIR]] 行）。" -ForegroundColor Yellow }
+            Write-Host "  （若上面识别错了，请粘贴口上文件夹的【绝对路径】——里面装着 .ERB 文件、路径用 \ 分段）" -ForegroundColor DarkGray
+            $ans = Read-Host "  确认就改这个文件夹吗？(Y=是 / P=打开文件夹选择窗口 / 或粘贴绝对路径)"
+            $atTgt = $null
+            if     ($ans -match '^[Yy]$' -and $atDef) { $atTgt = $atDef }
+            elseif ($ans -match '^[Pp]$') { $atTgt = Pick-Folder }
+            elseif ($ans -and $ans -notmatch '^[Yy]$') { $atTgt = $ans.Trim('"').Trim() }
+            if     (-not $atTgt) { Write-Host "  已跳过 K$cid 的自动测试回写。" -ForegroundColor DarkGray }
+            elseif (-not (Test-Path -LiteralPath $atTgt)) { Write-Host "  路径不存在，跳过：$atTgt" -ForegroundColor Red; $written = '路径不存在' }
+            else {
+                Write-Host "  回写 K$cid 自动测试结果中 ..." -ForegroundColor Cyan
+                & powershell -NoProfile -ExecutionPolicy Bypass -File $atup -CliLog $log -KojoDir $atTgt -Cid $cid
+                $written = "已回写 -> $atTgt"
+            }
+        } else { Write-Host "  已跳过 K$cid 的自动测试回写。" -ForegroundColor DarkGray }
+        $sum.Auto += @{ Cid = $cid; Result = $result; Written = $written }
+        Write-Host ("  提醒(K$cid)：本存档自动测试不会再自动触发（待命位 CFLAG:${cid}:1099 已置 2）；同档重跑输 CFLAG:${cid}:1099 = 1 再点会話。发布前记得删 AUTOTEST 钩子+AUTOTEST.ERB。") -ForegroundColor DarkGray
+    }
 }
 
+# ================= 手动测试 回写（逐角色，调 manual_scan.ps1）=================
 Write-Host ""
 Write-Host "  ──────────────── 手动测试 结果 ────────────────" -ForegroundColor Cyan
-if ($mtTids.Count -eq 0) { Write-Host "  没有手动测试标记可回写。全部完成。" -ForegroundColor DarkGray; Read-Host "`n  按回车关闭"; exit 0 }
-
-# 列出涉及的角色号
-$cids = @{}; $mtTids | ForEach-Object { if ($_ -match '^K(\d+)_') { $cids[$Matches[1]] = $true } }
-Write-Host ("`n  涉及角色：{0}" -f (($cids.Keys | Sort-Object | ForEach-Object { "K$_" }) -join ', '))
-$mtTids | ForEach-Object { Write-Host "     $_" -ForegroundColor Green }
-
-Write-Host ""
-Write-Host "  是否把这些【已触发】的分支回写进口上代码？" -ForegroundColor Cyan
-Write-Host "    （会把对应的  ;@AT 待手动测试 -> 测试通过，并删除那行  PRINTL [[MT ...]]  测试语句）"
-$doApply = Read-Host "  输入 Y 回车执行；其它则跳过"
-if ($doApply -notmatch '^[Yy]') { Write-Host "  已跳过回写（口上代码未改动）。" -ForegroundColor DarkGray; Read-Host "`n  按回车关闭"; exit 0 }
-
-# 对每个角色号，定位「真正含这些标记」的口上文件夹，并请用户确认后回写
-$kojoRoot = Join-Path $root 'ERB\口上・メッセージ関連\個人口上'
-foreach ($cid in ($cids.Keys | Sort-Object)) {
-    $needle = "[[MT K$cid" + "_"
-    $dirs = @()
-    if (Test-Path $kojoRoot) {
-        # 注意：必须用 @() 包住，否则单个结果会变成标量字符串，$dirs[0] 就取成首字符（比如只显示 "D"）
-        $dirs = @(Get-ChildItem -LiteralPath $kojoRoot -Recurse -Filter *.ERB -File -ErrorAction SilentlyContinue |
-            Where-Object { $_.Name -like "M_KOJO_K$cid`_*" } |
-            Where-Object { ([System.IO.File]::ReadAllText($_.FullName, $utf8n)).Contains($needle) } |
-            Select-Object -ExpandProperty DirectoryName -Unique)
-    }
+if ($mtTids.Count -eq 0) {
+    Write-Host "  没有手动测试标记可回写。" -ForegroundColor DarkGray
+} else {
+    $cids = @{}; $mtTids | ForEach-Object { if ($_ -match '^K(\d+)_') { $cids[$Matches[1]] = ($cids[$Matches[1]] + 1) } }
+    Write-Host ("`n  涉及角色：{0}" -f (($cids.Keys | Sort-Object | ForEach-Object { "K$_" }) -join ', '))
+    $mtTids | ForEach-Object { Write-Host "     $_" -ForegroundColor Green }
     Write-Host ""
-    Write-Host ("  === 角色 K$cid ===") -ForegroundColor Cyan
-    $target = $null
-    $pathHint = "（请粘贴口上文件夹的【绝对路径】——就是里面装着 .ERB 文件的那个文件夹，路径用 \ 分段，例如 D:\游戏\ERB\...\角色名）"
-    if ($dirs.Count -eq 1) {
-        Write-Host ("  检测到含这些测试语句的口上文件夹：`n     {0}" -f $dirs[0])
-        $ok = Read-Host "  确认就改这个文件夹吗？(Y=是 / P=打开文件夹选择窗口 / 或粘贴绝对路径)"
-        if     ($ok -match '^[Yy]$') { $target = $dirs[0] }
-        elseif ($ok -match '^[Pp]$') { $target = Pick-Folder }
-        elseif ($ok) { $target = $ok.Trim('"').Trim() }
-    } elseif ($dirs.Count -gt 1) {
-        Write-Host "  检测到多个可能的文件夹（可能你在同时开发多个变体），请确认要改哪个：" -ForegroundColor Yellow
-        for ($k=0; $k -lt $dirs.Count; $k++) { Write-Host ("     [{0}] {1}" -f $k, $dirs[$k]) }
-        Write-Host "  $pathHint" -ForegroundColor DarkGray
-        $sel = Read-Host "  输入序号选择 / P=打开文件夹选择窗口 / 或粘贴绝对路径 / 回车跳过"
-        if     ($sel -match '^\d+$' -and [int]$sel -lt $dirs.Count) { $target = $dirs[[int]$sel] }
-        elseif ($sel -match '^[Pp]$') { $target = Pick-Folder }
-        elseif ($sel) { $target = $sel.Trim('"').Trim() }
+    Write-Host "  是否把这些【已触发】的分支回写进口上代码？" -ForegroundColor Cyan
+    Write-Host "    （会把对应的  ;@AT 待手动测试 -> 测试通过，并删除那行  PRINTL [[MT ...]]  测试语句）"
+    $doApply = Read-Host "  输入 Y 回车执行；其它则跳过"
+    if ($doApply -notmatch '^[Yy]') {
+        Write-Host "  已跳过回写（口上代码未改动）。" -ForegroundColor DarkGray
+        foreach ($cid in $cids.Keys) { $sum.Manual += @{ Cid = $cid; Count = $cids[$cid]; Written = '已跳过' } }
     } else {
-        Write-Host "  没能自动找到含这些标记的 K$cid 口上文件夹，即将弹出文件夹选择窗口……" -ForegroundColor Yellow
-        $target = Pick-Folder
-        if (-not $target) {
-            Write-Host "  $pathHint" -ForegroundColor DarkGray
-            $sel = Read-Host "  （或直接粘贴该口上文件夹的绝对路径，回车跳过 K$cid）"
-            if ($sel) { $target = $sel.Trim('"').Trim() }
+        $kojoRoot = Join-Path $root 'ERB\口上・メッセージ関連\個人口上'
+        foreach ($cid in ($cids.Keys | Sort-Object)) {
+            $needle = "[[MT K$cid" + "_"
+            $dirs = @()
+            if (Test-Path $kojoRoot) {
+                $dirs = @(Get-ChildItem -LiteralPath $kojoRoot -Recurse -Filter *.ERB -File -ErrorAction SilentlyContinue |
+                    Where-Object { $_.Name -like "M_KOJO_K$cid`_*" } |
+                    Where-Object { ([System.IO.File]::ReadAllText($_.FullName, $utf8n)).Contains($needle) } |
+                    Select-Object -ExpandProperty DirectoryName -Unique)
+            }
+            Write-Host ""
+            Write-Host ("  === 角色 K$cid ===") -ForegroundColor Cyan
+            $target = $null
+            $pathHint = "（请粘贴口上文件夹的【绝对路径】——就是里面装着 .ERB 文件的那个文件夹，路径用 \ 分段）"
+            if ($dirs.Count -eq 1) {
+                Write-Host ("  检测到含这些测试语句的口上文件夹：`n     {0}" -f $dirs[0])
+                $ok = Read-Host "  确认就改这个文件夹吗？(Y=是 / P=打开文件夹选择窗口 / 或粘贴绝对路径)"
+                if     ($ok -match '^[Yy]$') { $target = $dirs[0] }
+                elseif ($ok -match '^[Pp]$') { $target = Pick-Folder }
+                elseif ($ok) { $target = $ok.Trim('"').Trim() }
+            } elseif ($dirs.Count -gt 1) {
+                Write-Host "  检测到多个可能的文件夹（可能你在同时开发多个变体），请确认要改哪个：" -ForegroundColor Yellow
+                for ($k=0; $k -lt $dirs.Count; $k++) { Write-Host ("     [{0}] {1}" -f $k, $dirs[$k]) }
+                Write-Host "  $pathHint" -ForegroundColor DarkGray
+                $sel = Read-Host "  输入序号选择 / P=打开文件夹选择窗口 / 或粘贴绝对路径 / 回车跳过"
+                if     ($sel -match '^\d+$' -and [int]$sel -lt $dirs.Count) { $target = $dirs[[int]$sel] }
+                elseif ($sel -match '^[Pp]$') { $target = Pick-Folder }
+                elseif ($sel) { $target = $sel.Trim('"').Trim() }
+            } else {
+                Write-Host "  没能自动找到含这些标记的 K$cid 口上文件夹，即将弹出文件夹选择窗口……" -ForegroundColor Yellow
+                $target = Pick-Folder
+                if (-not $target) {
+                    Write-Host "  $pathHint" -ForegroundColor DarkGray
+                    $sel = Read-Host "  （或直接粘贴该口上文件夹的绝对路径，回车跳过 K$cid）"
+                    if ($sel) { $target = $sel.Trim('"').Trim() }
+                }
+            }
+            if (-not $target) { Write-Host "  跳过 K$cid。" -ForegroundColor DarkGray; $sum.Manual += @{ Cid = $cid; Count = $cids[$cid]; Written = '已跳过(未定位)' }; continue }
+            if (-not (Test-Path -LiteralPath $target)) { Write-Host "  路径不存在，跳过：$target" -ForegroundColor Red; $sum.Manual += @{ Cid = $cid; Count = $cids[$cid]; Written = '路径不存在' }; continue }
+            Write-Host "  回写中 ..." -ForegroundColor Cyan
+            & powershell -NoProfile -ExecutionPolicy Bypass -File $scan -CliLog $log -KojoDir $target -Apply
+            $sum.Manual += @{ Cid = $cid; Count = $cids[$cid]; Written = "已回写 -> $target" }
         }
     }
-    if (-not $target) { Write-Host "  跳过 K$cid。" -ForegroundColor DarkGray; continue }
-    if (-not (Test-Path -LiteralPath $target)) { Write-Host "  路径不存在，跳过：$target" -ForegroundColor Red; continue }
-    Write-Host "  回写中 ..." -ForegroundColor Cyan
-    & powershell -NoProfile -ExecutionPolicy Bypass -File $scan -CliLog $log -KojoDir $target -Apply
 }
 
+# ================= 写本轮小结到 cliplog 末尾 =================
+Write-SessionSummary $sum
+
 Write-Host ""
-Write-Host "  全部完成。test_result.txt 已更新；已回写的分支状态变为 测试通过、测试语句已删除。" -ForegroundColor Green
+Write-Host "  全部完成。test_result.txt 已更新；本轮小结已附到 cliplog.txt 末尾。" -ForegroundColor Green
 Read-Host "  按回车关闭本窗口"

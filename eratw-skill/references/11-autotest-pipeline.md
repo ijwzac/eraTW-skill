@@ -206,7 +206,7 @@ Start-Process powershell -WindowStyle Hidden -ArgumentList @(
 
 **可脚本化的关联（让标志更新不耗 token）：**
 
-- 用一条稳定 id 注释给口上里每个可测分支打标：`;@TID K{id}_300_恋人`。
+- 用一条稳定 id 注释给口上里每个可测分支打标：`;@AT 待自动测试 K{id}_300_恋人`（格式＝ `;@AT <状态> <TID>`，见上表；**注意是 `;@AT` 不是 `;@TID`**）。
 - 测试套件把每个被执行的分支括起来：`PRINTL [[TID <id> BEGIN]]` … CALL … `PRINTL [[TID <id> OK]]`。
 - 一个脚本读抄本并重写源码里的 `;@AT <status> <id>` 行（`tools/at_update.ps1`）。裁决由 **END 哨兵门控**，这样剪贴板丢掉的 `OK` 不会导致误判失败：
   - **END 哨兵（`=====AUTOTEST_K{id}_END=====`）存在** → 测试套件跑到完成，无中止 → **每个打印了 `BEGIN` 的 TID = `测试通过`**，即便它的 `OK` 在屏幕边界丢了。

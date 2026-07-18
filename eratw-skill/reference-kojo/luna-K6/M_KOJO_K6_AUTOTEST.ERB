@@ -79,6 +79,14 @@ CALL M_KOJO_COLOR_K6
 RESETCOLOR
 PRINTL [[TID K6_COLOR OK]]
 
+
+PRINTL [[TID K6_300_時停 BEGIN]]
+CALL AT_CLEAR_K6
+FLAG:時間停止 = 1
+CALL M_KOJO_MESSAGE_COM_K6_300_1
+FLAG:時間停止 = 0
+PRINTL [[TID K6_300_時停 OK]]
+
 ;=====================================================================
 ;以下整段（ENCOUNTER / 300 / 301 / 302 / 309 / 311 / 312 / 332 / 306 / 307）
 ;均已【测试通过】，故用下方的 SKIP 跳过块从测试套件注销，以精简下次重跑。
@@ -94,12 +102,6 @@ PRINTL [[TID K6_ENCOUNTER OK]]
 ;用 CFLAG:6:1098=台词号 强制指定要演的那条，绕过池子的 RAND，确定性覆盖每一条台词；
 ;TID 与 日常系 里的 ;@AT 标签一一对应（不再有孤儿 TID）。覆盖状态(時停/318)在 ELSE 之前判定，仍用状态注入。
 ;--- 覆盖状态（不走 1098）---
-PRINTL [[TID K6_300_時停 BEGIN]]
-CALL AT_CLEAR_K6
-FLAG:時間停止 = 1
-CALL M_KOJO_MESSAGE_COM_K6_300_1
-FLAG:時間停止 = 0
-PRINTL [[TID K6_300_時停 OK]]
 
 PRINTL [[TID K6_300_318 BEGIN]]
 CALL AT_CLEAR_K6

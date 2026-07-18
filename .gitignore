@@ -21,3 +21,6 @@ cliplog.txt
 cliplog_*.txt
 autotest_cliplog.txt
 test_result.txt
+
+# 脚本本地备份（git 已有完整历史，不必入库）
+*.bak_*

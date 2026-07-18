@@ -1,1 +1,0 @@
-本文件是 eratw-skill 的 AUTOTEST 哨兵/标记。改名 autotest.on 启用自动测试待命，autotest.off 禁用。由 run_eratw_test.bat 自动切换。

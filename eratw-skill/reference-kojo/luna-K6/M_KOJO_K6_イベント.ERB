@@ -43,13 +43,7 @@ IF !TALENT:6:恋慕 && !TALENT:6:炮友
 ELSE
 	CFLAG:6:推倒禁止 = 0
 ENDIF
-;=== AUTOTEST 外部 arm 哨兵（本 skill 口上的标记 + 开关；面向玩家交付前删除本段与哨兵文件）===
-;  本口上目录里放一个哨兵文件：autotest.on=启用 / autotest.off=禁用（用文件名编码状态，因 EXISTFILE 只判存在）。
-;  启动器扫 個人口上/**/autotest.o* 即可发现所有 skill 口上并读出状态，并按玩家选择在 .on/.off 间改名切换。
-;  读档时本函数必被调用：若哨兵为 autotest.on 就把待命位置 1。!=2 保持三态语义(本存档跑过一次不再重 arm)。
-IF CFLAG:6:1099 != 2 && EXISTFILE("ERB/口上・メッセージ関連/個人口上/006 Luna [ルナ]/露娜切露德_重制/autotest.on")
-	CFLAG:6:1099 = 1
-ENDIF
+;（AUTOTEST 不再靠 FLAGSETTING+CFLAG:1099 arm——改为会話钩子直接读 autotest.txt 内容，见 AUTOTEST.ERB 头部。）
 RETURN 1
 
 ;### 口上颜色判定 ###################################
@@ -368,9 +362,7 @@ IF LOCAL
 			PRINTL [[MT K6_EV4_打招呼_恋人]]
 			PRINTFORMW 「呀，%CALLNAME:MASTER%！……只是路过？哼，那下次可要停下来陪我说会儿话哦。」
 		ELSEIF TALENT:6:恋慕
-			;@AT 待手动测试 K6_EV4_打招呼_恋慕
-			SIF K6_MT_ON()
-			PRINTL [[MT K6_EV4_打招呼_恋慕]]
+			;@AT 测试通过 K6_EV4_打招呼_恋慕
 			PRINTFORMW 「啊，是你……嗯、嗯，路上小心。才、才不是舍不得你走呢。」
 		ELSEIF TALENT:6:思慕 || CFLAG:6:好感度 >= 500
 			;@AT 测试通过 K6_EV4_打招呼_思慕
@@ -657,34 +649,34 @@ SELECTCASE ARG
 		CSTR:6:81 = %GIFT_NAME%
 		CFLAG:6:1082 += 1
 		IF STRCOUNT(SENSE, "飲料/") || STRCOUNT(GIFT_NAME, "咖啡")
-			;@AT 待自动测试 K6_GIFT_珍藏咖啡
+			;@AT 测试通过 K6_GIFT_珍藏咖啡
 			PRINTFORML 「咖、咖啡豆！你怎么知道……！这可比从茶店偷来的香多了！」
 			PRINTFORMW 「哼，算你有心。……谢、谢谢啦。」
 		ELSE
-			;@AT 待自动测试 K6_GIFT_珍藏其它
+			;@AT 测试通过 K6_GIFT_珍藏其它
 			PRINTFORML 「哇——这个『%GIFT_NAME%』，会不会反光？摆在房间里，像不像掉下来的月亮？」
 			PRINTFORMW 「嘿嘿……我要把房间，变成地上的月亮呢。」
 		ENDIF
 	CASE 3
 		;刷新「最爱」纪录——紧接在 ARG2 的反应之后发，故这里只补一句短的。
-		;@AT 待自动测试 K6_GIFT_最爱
+		;@AT 测试通过 K6_GIFT_最爱
 		PRINTFORMW 「……这个啊，是我收到过的里面，最喜欢的了。才、才不是因为是你送的哦！」
 	CASE 4
 		;普通收下（400-699）——最常见的一档：不讨厌，但也没到珍藏的程度。
 		IF CFLAG:6:好感度 >= 1000
-			;@AT 待自动测试 K6_GIFT_普通心动
+			;@AT 测试通过 K6_GIFT_普通心动
 			PRINTFORML 「『%GIFT_NAME%』……嗯，收下了。」
 			PRINTFORMW （露娜嘴上淡淡的，转身却把它仔细揣进了怀里。）
 		ELSE
-			;@AT 待自动测试 K6_GIFT_普通中立
+			;@AT 测试通过 K6_GIFT_普通中立
 			PRINTFORML 「唔……『%GIFT_NAME%』啊。谢、谢谢……大概？」
 			PRINTFORMW （她翻来覆去看了半天，好像在认真研究这东西到底能拿来干嘛。）
 		ENDIF
 	CASE 1
-		;@AT 待自动测试 K6_GIFT_回礼
+		;@AT 测试通过 K6_GIFT_回礼
 		PRINTFORMW 「那个…我上次满月捡到了这个『%GIFT_NAME%』，你如果…如果…总之你就收下嘛。」
 	CASE 5
-		;@AT 待自动测试 K6_GIFT_变卖
+		;@AT 测试通过 K6_GIFT_变卖
 		PRINTFORMW （露娜把『%GIFT_NAME%』掂了掂，趁你没注意，无声无息地塞进了怀里……）
 ENDSELECT
 RETURN 1

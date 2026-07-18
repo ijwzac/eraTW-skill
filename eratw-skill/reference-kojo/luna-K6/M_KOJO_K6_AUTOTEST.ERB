@@ -1,20 +1,19 @@
 ﻿;============================================================
 ;AUTOTEST harness for K6 (露娜切露德) — 临时文件，交付前必须删除！
 ;
-;触发：会話(300) 处理体顶部一个守卫钩子调用本测试套件：
+;触发：会話(300) 处理体顶部一个钩子读 autotest.txt 的内容来决定是否调用本测试套件：
 ;   @M_KOJO_MESSAGE_COM_K6_300  顶部：
-;     IF CFLAG:6:1099 == 1
+;     LOADTEXT "ERB/…/露娜切露德_重制/autotest.txt"
+;     IF RESULT && STRCOUNT(RESULTS, "on")
 ;         CALL M_KOJO_K6_AUTOTEST
 ;         RETURN 1
 ;     ENDIF
 ;
-;守卫＝单一持久变量 CFLAG:6:1099 的「三态待命位」（不依赖 DEBUGGERR——developer 版默认也是 0，
-;且 DEBUGGERR 还门控游戏其它调试功能，不宜借用）。SKILL 约定：CFLAG:{角色号}:1099 = autotest 待命位。
-;  0 = 从未待命（默认值，真实玩家永远是 0）→ 永不触发（对玩家绝对安全）
-;  1 = 已待命（只能由调试指令手动 arm）→ 触发一次，测试套件跑完立刻置 2
-;  2 = 本次已跑（跨天仍是 2，CFLAG 持久不每日清零）→ 不再触发
-;  开测/重测：调试台输  CFLAG:6:1099 = 1  （arm 一次）。想再跑：再输一次  CFLAG:6:1099 = 1 。
-;  为何比 DEBUGGERR 好：默认 0＝永不触发，从根上对玩家安全，不靠外部开关兜底；且 CFLAG 跨天持久。
+;开关＝本口上目录 autotest.txt 的【内容】：on=启用 / off=禁用。**与游戏存档完全无关**（这正是想要的：
+;  autotest 本就该跟存档无关）。会話时读内容：on 就跑一次、套件结尾 SAVETEXT 写回 off（自动关）。
+;  玩家默认没有 autotest.txt 或内容 off → 永不触发（对玩家安全）。
+;  开测/重测：启动器 run_eratw_test.bat 选【启用】把内容改成 on；或手动把 autotest.txt 内容改回 on。
+;  ⚠SAVETEXT/LOADTEXT：路径相对游戏根、【必须用正斜杠 /】（反斜杠会被当普通字符、路径拼成怪文件名）、限 .txt。
 ;
 ;⚠ 仍属临时测试代码：交付前请用启动器把钩子注释掉并删除本文件。
 ;
@@ -74,7 +73,7 @@ PRINTFORML [INFO] K6=%CALLNAME:6% MASTER=%CALLNAME:MASTER% 面識={CFLAG:6:面�
 ;--- COLOR（无台词，仅应用颜色）---
 ;纯冒烟测试：M_KOJO_COLOR_K6 只设颜色、没有台词分支，源码里没有天然的 ;@AT 落点，
 ;故把标签写在测试套件里紧挨 [[TID BEGIN]] 之上——否则 at_update 会报「TIDs in log with no source ;@AT tag」。
-;@AT 待自动测试 K6_COLOR
+;@AT 测试通过 K6_COLOR
 PRINTL [[TID K6_COLOR BEGIN]]
 CALL M_KOJO_COLOR_K6
 RESETCOLOR
@@ -816,11 +815,11 @@ CFLAG:6:1081 = sav:16
 CFLAG:6:1082 = sav:17
 CSTR:6:81 = %savs:0%
 
-;--- 待命位 1→2（本次已跑，不再自动重触发）；想再跑：调试台输 CFLAG:6:1099 = 1 重新 arm ---
-CFLAG:6:1099 = 2
+;--- 跑完把开关写回 off（自动关，避免同存档/换存档重复触发）；想再跑：启动器选启用，或手动把 autotest.txt 改回 on ---
+SAVETEXT "off", "ERB/口上・メッセージ関連/個人口上/006 Luna [ルナ]/露娜切露德_重制/autotest.txt"
 
 PRINTL =====AUTOTEST_K6_END=====
-PRINTW [AUTOTEST] 完成 —— 状态已复原 —— CFLAG:6:1099 已 1→2（不再自动重跑；想再跑输 CFLAG:6:1099=1 重新待命）—— 点击返回
+PRINTW [AUTOTEST] 完成 —— 状态已复原 —— autotest.txt 已写回 off（不再自动重跑；想再跑：启动器选启用 或 手动改回 on）—— 点击返回
 RETURN 1
 
 ;--- 辅助：清零全部关系层 + 好感度/心情（否则存档里的高好感度会遮蔽低档分支）---

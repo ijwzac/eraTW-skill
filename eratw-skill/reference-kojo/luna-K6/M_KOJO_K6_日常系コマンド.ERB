@@ -19,10 +19,13 @@ TFLAG:192 = 0
 RETURN 0
 
 @M_KOJO_MESSAGE_COM_K6_300
-;=== AUTOTEST 钩子（临时；发布口上前请注释掉本段）===
-;  守卫＝待命位 CFLAG:6:1099 三态：0 从未待命(玩家默认,永不触发) / 1 已待命(调试台手动 arm) / 2 本次已跑。
-;  仅当 ==1 触发一次，测试套件跑完置 2。开测/重测：调试台输  CFLAG:6:1099 = 1  重新待命（不依赖 DEBUGGERR）。
-IF CFLAG:6:1099 == 1
+;=== AUTOTEST 钩子（临时；发布前请注释本段 + 删 AUTOTEST.ERB + 删 autotest.txt）===
+;  开关＝本口上目录 autotest.txt 的【内容】：on=启用 / off=禁用（与存档完全无关——正是想要的）。
+;  会話时读它：内容含 on 就跑一次测试套件；套件结尾 SAVETEXT 把它写回 off（自动关、避免重复）。
+;  玩家默认没有 autotest.txt 或内容为 off → LOADTEXT 失败/非on → 永不触发（对玩家安全）。
+;  ⚠SAVETEXT/LOADTEXT：路径相对游戏根、【必须用正斜杠 /】、限 .txt（emuera.config 白名单）。
+LOADTEXT "ERB/口上・メッセージ関連/個人口上/006 Luna [ルナ]/露娜切露德_重制/autotest.txt"
+IF RESULT && STRCOUNT(RESULTS, "on")
 	CALL M_KOJO_K6_AUTOTEST
 	RETURN 1
 ENDIF
@@ -655,9 +658,7 @@ IF LOCAL
 				PRINTFORMW （露娜嘴上抱怨，扫起地来却意外认真，还顺手把周围的声音都消了——说是「这样灰尘落地也不吵」。）
 			CASEELSE
 				;只是看着
-				;@AT 待手动测试 K6_410_旁观
-				SIF K6_MT_ON()
-				PRINTL [[MT K6_410_旁观]]
+				;@AT 测试通过 K6_410_旁观
 				PRINTFORMW 「打扫啊……我看着就好。夜里我可是很勤快的，白天嘛……你、你就别指望啦。」
 		ENDSELECT
 	ENDIF

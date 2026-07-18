@@ -47,7 +47,7 @@ Write-Host ""
 Write-Host "  请选择要启动的游戏版本："
 Write-Host "    [1] 开发者版(调试模式)  —— 想要 Debug 窗口与调试信息就用它"
 Write-Host "    [2] 普通玩家版          —— 平时游玩用它"
-Write-Host "  两个版本都能触发手动测试与自动测试（自动测试靠哨兵文件 arm，不必非得用调试台）。"
+Write-Host "  两个版本都能触发手动测试与自动测试（自动测试靠 autotest.txt 内容开关，与存档无关，不用调试台）。"
 Write-Host "  Debug 窗口能输入作弊/调试指令，具体可询问 AI。"
 Write-Host ""
 $choice = Read-Host "  输入 1 或 2 后回车"
@@ -83,34 +83,36 @@ if (Test-Path $log) { Move-Item $log (Join-Path $skillDir ("cliplog_" + (Get-Dat
 Remove-Item (Join-Path $root 'lazyloading.dat') -Force -ErrorAction SilentlyContinue
 Remove-Item (Join-Path $root 'emuera.log')       -Force -ErrorAction SilentlyContinue
 
-# ================= 自动测试哨兵：扫描本 skill 口上、询问是否启用 =================
-# 本工具写的口上目录里放着哨兵文件 autotest.on(启用)/autotest.off(禁用)。扫出它们即可
-# 发现哪些口上是本工具写的、且当前 arm 状态；按玩家选择在 .on/.off 间改名切换。
-# 读档时各口上的 @M_KOJO_FLAGSETTING 会 EXISTFILE 检查 autotest.on 来置待命位 CFLAG:{id}:1099=1，
-# 于是玩家不必在调试台打字：读档进游戏、跟该角色【会話】一次即自动跑测试套件。
+# ================= 自动测试开关：扫描本 skill 口上的 autotest.txt、询问是否启用 =================
+# 本工具写的每个口上目录里放着 autotest.txt，【内容】= on(启用) / off(禁用)。扫出它即可发现哪些
+# 口上是本工具写的、并读出当前开关。用户选启用/禁用则改写其【内容】（不是改文件名）。
+# 会話时口上钩子 LOADTEXT 读它：内容含 on 就跑一次测试套件、结尾 SAVETEXT 写回 off（自动关）。
+# 【与游戏存档完全无关】：任何存档只要 autotest.txt=on、会話一次就触发；跑完自动写回 off。
 $kojoRoot = Join-Path $root 'ERB\口上・メッセージ関連\個人口上'
 $sentinels = @()
 if (Test-Path -LiteralPath $kojoRoot) {
     $sentinels = @(Get-ChildItem -LiteralPath $kojoRoot -Recurse -File -ErrorAction SilentlyContinue |
-        Where-Object { $_.Name -eq 'autotest.on' -or $_.Name -eq 'autotest.off' })
+        Where-Object { $_.Name -eq 'autotest.txt' })
 }
 if ($sentinels.Count -gt 0) {
     Write-Host ""
     Write-Host "  ──────────────── 自动测试 AUTOTEST ────────────────" -ForegroundColor Cyan
-    Write-Host "  发现 $($sentinels.Count) 个本工具写的口上带自动测试套件，当前状态："
+    Write-Host "  发现 $($sentinels.Count) 个本工具写的口上带自动测试，当前开关（autotest.txt 内容）："
     foreach ($s in $sentinels) {
-        $on = ($s.Name -eq 'autotest.on')
+        $content = ''
+        try { $content = ([System.IO.File]::ReadAllText($s.FullName)).Trim() } catch {}
+        $on = ($content -match 'on')
         $kojo = Split-Path -Leaf (Split-Path -Parent $s.FullName)
         Write-Host ("     [{0}] {1}" -f $(if ($on) { '已启用' } else { '已禁用' }), $kojo) -ForegroundColor $(if ($on) { 'Green' } else { 'DarkGray' })
     }
-    Write-Host "  启用后：读档进游戏、跟该角色【会話】一次即自动跑完整测试套件（无需在调试台打字）。"
+    Write-Host "  启用后：读档进游戏、跟该角色【会話】一次即自动跑完整测试套件（与存档无关，跑完自动关）。"
     $atc = Read-Host "  [A]全部启用  [N]全部禁用  [回车]保持不变"
     if ($atc -match '^[Aa]') {
-        foreach ($s in $sentinels) { if ($s.Name -eq 'autotest.off') { Rename-Item -LiteralPath $s.FullName -NewName 'autotest.on' -Force -ErrorAction SilentlyContinue } }
-        Write-Host "  ✓ 已全部【启用】自动测试。" -ForegroundColor Green
+        foreach ($s in $sentinels) { [System.IO.File]::WriteAllText($s.FullName, 'on') }
+        Write-Host "  ✓ 已全部【启用】自动测试（autotest.txt 内容 -> on）。" -ForegroundColor Green
     } elseif ($atc -match '^[Nn]') {
-        foreach ($s in $sentinels) { if ($s.Name -eq 'autotest.on') { Rename-Item -LiteralPath $s.FullName -NewName 'autotest.off' -Force -ErrorAction SilentlyContinue } }
-        Write-Host "  ✓ 已全部【禁用】自动测试。" -ForegroundColor DarkGray
+        foreach ($s in $sentinels) { [System.IO.File]::WriteAllText($s.FullName, 'off') }
+        Write-Host "  ✓ 已全部【禁用】自动测试（autotest.txt 内容 -> off）。" -ForegroundColor DarkGray
     } else {
         Write-Host "  · 保持不变。" -ForegroundColor DarkGray
     }
@@ -152,9 +154,8 @@ if ($choice -eq '1') {
     Write-Host ""
     Write-Host "  【跑自动测试 AUTOTEST（仅当该角色的口上装了自动测试套件时才需要）】" -ForegroundColor Cyan
     Write-Host "     若刚才在启动前选了【启用】：直接读档、对该角色点一次「会話」就会自动跑一轮，【不用输入任何东西】。"
-    Write-Host "     例外——该存档【以前已经跑过】一轮时（待命位已置 2，哨兵只让没跑过的存档待命、不会重复触发）："
-    Write-Host "     想用同一个存档再跑一轮，就在调试控制台输入下面这行重新待命，再点「会話」："
-    Write-Host "           CFLAG:<角色号>:1099 = 1     （把 <角色号> 换成你要测的角色号；不依赖 DEBUGGERR）" -ForegroundColor Yellow
+    Write-Host "     跑完后测试套件会把 autotest.txt 写回 off（自动关），所以【与存档无关、不会重复触发】。"
+    Write-Host "     想再跑一轮：关掉游戏、重开本启动器再选【启用】即可（任何存档都行）；或手动把 autotest.txt 内容改回 on。"
     Write-Host "     若你不是在做自动测试，忽略本段、照常游玩即可。"
 } else {
     Write-Host "  普通玩家版：照平时游玩即可，事件/约会等只能实际游玩触发的对话会被记录，供稍后统计。" -ForegroundColor Cyan
@@ -300,7 +301,7 @@ while (-not $game.HasExited) {
     Write-Host "  ┌─ eraTW 验证控制台 · 实时监控中 ($modeName) ────────────────" -ForegroundColor Cyan
     Write-Host "  │ 正在实时记录游戏文字到 cliplog.txt（无需手动复制）。保持本窗口开着，关掉游戏后自动统计。"
     if ($tapRestarts -gt 0) { Write-Host ("  │ （抓取器曾自动重启 {0} 次——属正常自愈，不影响记录）" -f $tapRestarts) -ForegroundColor DarkGray }
-    if ($choice -eq '1') { Write-Host "  │ 跑自动测试（如有）：启动前选了【启用】就直接点「会話」；已跑过的存档要重跑才需调试台输 CFLAG:<角色号>:1099 = 1。" -ForegroundColor DarkGray }
+    if ($choice -eq '1') { Write-Host "  │ 跑自动测试（如有）：启动前选了【启用】就直接点「会話」，跑完自动关；要再跑重开启动器选启用即可（不用调试台）。" -ForegroundColor DarkGray }
     else                 { Write-Host "  │ 正常游玩即可；触发到需手动测试的对话时看到 [[MT ...]] 测试语句是正常的。" -ForegroundColor DarkGray }
     if ($atShown) { Write-Host "  │ ✓ 已抽出 AUTOTEST 结果 -> test_result.txt" -ForegroundColor Green }
     Write-Host "  └───────────── 游戏输出的最后 20 行 ──────────────" -ForegroundColor Cyan
@@ -466,7 +467,7 @@ if ($atBlocks.Count -eq 0) {
             }
         } else { Write-Host "  已跳过 K$cid 的自动测试回写。" -ForegroundColor DarkGray }
         $sum.Auto += @{ Cid = $cid; Result = $result; Written = $written }
-        Write-Host ("  提醒(K$cid)：本存档自动测试不会再自动触发（待命位 CFLAG:${cid}:1099 已置 2）；同档重跑输 CFLAG:${cid}:1099 = 1 再点会話。发布前记得删 AUTOTEST 钩子+AUTOTEST.ERB。") -ForegroundColor DarkGray
+        Write-Host ("  提醒(K$cid)：测试套件跑完已把 autotest.txt 写回 off（不会重复触发、与存档无关）；想再跑重开启动器选启用即可。发布前记得删 AUTOTEST 钩子+AUTOTEST.ERB+autotest.txt。") -ForegroundColor DarkGray
     }
 }
 

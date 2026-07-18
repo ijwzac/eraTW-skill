@@ -207,18 +207,41 @@ function Get-AutotestBlocks {
     }
     return @($res.Values)
 }
-function Write-SessionSummary($sum) {
-    # 把本轮会话小结追加到 cliplog 末尾：编译错误/运行崩溃/各口上自动测试结果+是否回写/手动测试+是否回写。
+function Write-SessionSummary($sum, $atBlocks, $mtTids) {
+    # 把本轮会话小结追加到 cliplog 末尾：编译错误/运行崩溃/各口上自动测试结果+是否回写+【触发的每个TID及判定】/
+    # 手动测试+是否回写+【触发的每个MT标记】。多写几十行无妨，方便 AI/用户复盘到底测了哪些分支。
     $L = @()
     $L += "===== [启动器附加] 本轮测试会话小结（$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')）====="
     $L += ("· 编译/脚本错误：{0}" -f $(if ($sum.CompileError) { '是 —— 游戏未能正常启动（见上）' } else { '否' }))
     $L += ("· 运行中崩溃：{0}"   -f $(if ($sum.RuntimeCrash) { '是 —— 见上方并入的 emuera.log 堆栈' } else { '否' }))
     $L += "· 自动测试 AUTOTEST："
     if (-not $sum.Auto -or $sum.Auto.Count -eq 0) { $L += "    （本轮未跑）" }
-    else { foreach ($a in $sum.Auto) { $L += ("    - K{0}：{1}；回写：{2}" -f $a.Cid, $a.Result, $a.Written) } }
+    else {
+        foreach ($a in $sum.Auto) {
+            $L += ("    - K{0}：{1}；回写：{2}" -f $a.Cid, $a.Result, $a.Written)
+            # 列出该口上触发的每个 TID + 判定（END 在则全通过；halt 则最后一个 BEGIN 是崩溃点、失败）
+            $blk = @($atBlocks | Where-Object { $_.Cid -eq $a.Cid }) | Select-Object -First 1
+            if ($blk) {
+                $bg = @([regex]::Matches($blk.Raw, '\[\[TID\s+(\S+)\s+BEGIN\]\]') | ForEach-Object { $_.Groups[1].Value })
+                $last = if ($bg.Count) { $bg[$bg.Count - 1] } else { $null }
+                foreach ($t in $bg) {
+                    $vd = if (-not $blk.Halted) { '通过' } elseif ($t -eq $last) { '失败(崩溃点)' } else { '通过' }
+                    $L += ("        · {0}  {1}" -f $t, $vd)
+                }
+            }
+        }
+    }
     $L += "· 手动测试："
-    if (-not $sum.Manual -or $sum.Manual.Count -eq 0) { $L += "    （本轮无触发的手动标记）" }
-    else { foreach ($h in $sum.Manual) { $L += ("    - K{0}：触发 {1} 个标记；回写：{2}" -f $h.Cid, $h.Count, $h.Written) } }
+    if (-not $mtTids -or @($mtTids).Count -eq 0) { $L += "    （本轮无触发的手动标记）" }
+    else {
+        # 按角色分组，列出每个触发的 MT 标记
+        $byC = @{}
+        foreach ($t in $mtTids) { if ($t -match '^K(\d+)_') { $c = $Matches[1]; if (-not $byC.ContainsKey($c)) { $byC[$c] = @() }; $byC[$c] += $t } }
+        foreach ($h in $sum.Manual) {
+            $L += ("    - K{0}：触发 {1} 个标记；回写：{2}" -f $h.Cid, $h.Count, $h.Written)
+            foreach ($t in $byC[$h.Cid]) { $L += ("        · {0}" -f $t) }
+        }
+    }
     $L += "===== 小结结束 ====="
     [System.IO.File]::AppendAllText($log, "`r`n" + ($L -join "`r`n") + "`r`n", $utf8n)
 }
@@ -366,7 +389,7 @@ if ($compileError) {
     Write-Host "   文件：$log" -ForegroundColor Yellow
     Write-Host ""
     Write-Host "   （游戏没有真正跑起来，故跳过自动/手动测试统计——那些结果此时是空的、只会误导。）" -ForegroundColor DarkGray
-    Write-SessionSummary @{ CompileError = $true; RuntimeCrash = $false; Auto = @(); Manual = @() }
+    Write-SessionSummary @{ CompileError = $true; RuntimeCrash = $false; Auto = @(); Manual = @() } @() @()
     Read-Host "`n  按回车关闭"
     exit 0
 }
@@ -511,7 +534,7 @@ if ($mtTids.Count -eq 0) {
 }
 
 # ================= 写本轮小结到 cliplog 末尾 =================
-Write-SessionSummary $sum
+Write-SessionSummary $sum $atBlocks $mtTids
 
 Write-Host ""
 Write-Host "  全部完成。test_result.txt 已更新；本轮小结已附到 cliplog.txt 末尾。" -ForegroundColor Green

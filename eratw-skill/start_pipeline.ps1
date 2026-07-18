@@ -61,8 +61,8 @@ Write-Host ""
 Write-Host "  ⚠ 继续将会：" -ForegroundColor Yellow
 Write-Host "      · 结束当前正在运行的同款游戏与后台抓取器（若有）；"
 Write-Host "      · 把上一份 cliplog.txt 归档备份（重命名，不会真删），然后开始全新记录。"
-$go = Read-Host "  确认继续请输入 Y 回车（其它则取消）"
-if ($go -notmatch '^[Yy]') { Write-Host "  已取消。" -ForegroundColor DarkGray; Read-Host "  回车退出"; exit 0 }
+$go = Read-Host "  确认继续请输入 Y 或 1 回车（其它则取消）"
+if ($go -notmatch '^[Yy1]') { Write-Host "  已取消。" -ForegroundColor DarkGray; Read-Host "  回车退出"; exit 0 }
 
 Write-Host "`n  [1/4] 清理上次的后台抓取器 / 上一局游戏 ..."
 Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" -ErrorAction SilentlyContinue |
@@ -106,11 +106,11 @@ if ($sentinels.Count -gt 0) {
         Write-Host ("     [{0}] {1}" -f $(if ($on) { '已启用' } else { '已禁用' }), $kojo) -ForegroundColor $(if ($on) { 'Green' } else { 'DarkGray' })
     }
     Write-Host "  启用后：读档进游戏、跟该角色【会話】一次即自动跑完整测试套件（与存档无关，跑完自动关）。"
-    $atc = Read-Host "  [A]全部启用  [N]全部禁用  [回车]保持不变"
-    if ($atc -match '^[Aa]') {
+    $atc = Read-Host "  [A 或 1]全部启用  [N 或 2]全部禁用  [回车]保持不变"
+    if ($atc -match '^[Aa1]') {
         foreach ($s in $sentinels) { [System.IO.File]::WriteAllText($s.FullName, 'on') }
         Write-Host "  ✓ 已全部【启用】自动测试（autotest.txt 内容 -> on）。" -ForegroundColor Green
-    } elseif ($atc -match '^[Nn]') {
+    } elseif ($atc -match '^[Nn2]') {
         foreach ($s in $sentinels) { [System.IO.File]::WriteAllText($s.FullName, 'off') }
         Write-Host "  ✓ 已全部【禁用】自动测试（autotest.txt 内容 -> off）。" -ForegroundColor DarkGray
     } else {
@@ -445,19 +445,19 @@ if ($atBlocks.Count -eq 0) {
             $result = "完整跑完，$begins 个分支通过"
         }
         Write-Host ("  是否把 K$cid 的自动测试结果回写口上代码？（;@AT -> 测试通过/失败）") -ForegroundColor Cyan
-        $doAt = Read-Host "  输入 Y 回车执行；其它则跳过"
+        $doAt = Read-Host "  输入 Y 或 1 回车执行；其它则跳过"
         $written = '已跳过'
-        if ($doAt -match '^[Yy]') {
+        if ($doAt -match '^[Yy1]') {
             $rel = $blk.KojoRel
             $atDef = if ($rel) { Join-Path $root ($rel -replace '/','\') } else { '' }
             if ($atDef) { Write-Host ("  从 AUTOTEST 首行识别到 K$cid 的口上文件夹：`n     {0}" -f $atDef) }
             else        { Write-Host "  没能从日志自动识别口上文件夹（该 AUTOTEST 未打印 [[KOJODIR]] 行）。" -ForegroundColor Yellow }
             Write-Host "  （若上面识别错了，请粘贴口上文件夹的【绝对路径】——里面装着 .ERB 文件、路径用 \ 分段）" -ForegroundColor DarkGray
-            $ans = Read-Host "  确认就改这个文件夹吗？(Y=是 / P=打开文件夹选择窗口 / 或粘贴绝对路径)"
+            $ans = Read-Host "  确认就改这个文件夹吗？(Y 或 1=是 / P 或 2=打开文件夹选择窗口 / 或粘贴绝对路径)"
             $atTgt = $null
-            if     ($ans -match '^[Yy]$' -and $atDef) { $atTgt = $atDef }
-            elseif ($ans -match '^[Pp]$') { $atTgt = Pick-Folder }
-            elseif ($ans -and $ans -notmatch '^[Yy]$') { $atTgt = $ans.Trim('"').Trim() }
+            if     ($ans -match '^[Yy1]$' -and $atDef) { $atTgt = $atDef }
+            elseif ($ans -match '^[Pp2]$') { $atTgt = Pick-Folder }
+            elseif ($ans -and $ans -notmatch '^[Yy1]$') { $atTgt = $ans.Trim('"').Trim() }
             if     (-not $atTgt) { Write-Host "  已跳过 K$cid 的自动测试回写。" -ForegroundColor DarkGray }
             elseif (-not (Test-Path -LiteralPath $atTgt)) { Write-Host "  路径不存在，跳过：$atTgt" -ForegroundColor Red; $written = '路径不存在' }
             else {
@@ -483,8 +483,8 @@ if ($mtTids.Count -eq 0) {
     Write-Host ""
     Write-Host "  是否把这些【已触发】的分支回写进口上代码？" -ForegroundColor Cyan
     Write-Host "    （会把对应的  ;@AT 待手动测试 -> 测试通过，并删除那行  PRINTL [[MT ...]]  测试语句）"
-    $doApply = Read-Host "  输入 Y 回车执行；其它则跳过"
-    if ($doApply -notmatch '^[Yy]') {
+    $doApply = Read-Host "  输入 Y 或 1 回车执行；其它则跳过"
+    if ($doApply -notmatch '^[Yy1]') {
         Write-Host "  已跳过回写（口上代码未改动）。" -ForegroundColor DarkGray
         foreach ($cid in $cids.Keys) { $sum.Manual += @{ Cid = $cid; Count = $cids[$cid]; Written = '已跳过' } }
     } else {
@@ -504,9 +504,9 @@ if ($mtTids.Count -eq 0) {
             $pathHint = "（请粘贴口上文件夹的【绝对路径】——就是里面装着 .ERB 文件的那个文件夹，路径用 \ 分段）"
             if ($dirs.Count -eq 1) {
                 Write-Host ("  检测到含这些测试语句的口上文件夹：`n     {0}" -f $dirs[0])
-                $ok = Read-Host "  确认就改这个文件夹吗？(Y=是 / P=打开文件夹选择窗口 / 或粘贴绝对路径)"
-                if     ($ok -match '^[Yy]$') { $target = $dirs[0] }
-                elseif ($ok -match '^[Pp]$') { $target = Pick-Folder }
+                $ok = Read-Host "  确认就改这个文件夹吗？(Y 或 1=是 / P 或 2=打开文件夹选择窗口 / 或粘贴绝对路径)"
+                if     ($ok -match '^[Yy1]$') { $target = $dirs[0] }
+                elseif ($ok -match '^[Pp2]$') { $target = Pick-Folder }
                 elseif ($ok) { $target = $ok.Trim('"').Trim() }
             } elseif ($dirs.Count -gt 1) {
                 Write-Host "  检测到多个可能的文件夹（可能你在同时开发多个变体），请确认要改哪个：" -ForegroundColor Yellow
